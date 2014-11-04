@@ -18,12 +18,10 @@
 #define PyString_AsStringAndSize2 PyUnicode_AsUTF8AndSize
 #define PyString_Type  PyUnicode_Type
 #else
-#error "only python3 compatible"
 #define PyBytes_FromStringAndSize PyString_FromStringAndSize
 #define _PyBytes_Resize _PyString_Resize
 #define PyBytes_AS_STRING PyString_AS_STRING
 
-#define PY_MOD_RETURN(m) return
 inline char *PyString_AsStringAndSize2(PyObject *obj, Py_ssize_t *length) {
     char* buffer = NULL;
     PyString_AsStringAndSize(obj, &buffer, length);
