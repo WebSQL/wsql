@@ -18,11 +18,11 @@ PyModuleDef _mysql_constants_module =
 int _mysql_constants_add(
     PyObject* module)
 {
-	PyObject *constants = NULL;
+    PyObject *constants = NULL;
 #ifdef PY3K
     constants = PyModule_Create(&_mysql_constants_module);
 #else
-	constants = Py_InitModule3("_mysql.constants", NULL, _mysql_constants__doc__);
+    constants = Py_InitModule3("_mysql.constants", NULL, _mysql_constants__doc__);
 #endif
     if (!constants)
         return -1;

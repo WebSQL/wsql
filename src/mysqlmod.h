@@ -21,29 +21,29 @@ typedef int Py_ssize_t;
 #endif
 
 typedef struct {
-	PyObject_HEAD
-	MYSQL connection;
-	int open;
-	int autocommit;
+    PyObject_HEAD
+    MYSQL connection;
+    int open;
+    int autocommit;
 } _mysql_connection_object;
 
 extern PyTypeObject _mysql_connection_object_t;
 
 typedef struct {
-	PyObject_HEAD
-	PyObject *connection;
-	MYSQL_RES *result;
-	int num_fields;
-	int use;
-	PyObject *fields;
+    PyObject_HEAD
+    PyObject *connection;
+    MYSQL_RES *result;
+    int num_fields;
+    int use;
+    PyObject *fields;
 } _mysql_result_object;
 
 extern PyTypeObject _mysql_result_object_t;
 
 typedef struct {
-	PyObject_HEAD
-	MYSQL_FIELD field;
-	unsigned int index;
+    PyObject_HEAD
+    MYSQL_FIELD field;
+    unsigned int index;
 } _mysql_field_object;
 
 extern PyTypeObject _mysql_field_object_t;
@@ -80,21 +80,21 @@ extern char _mysql_connect__doc__[];
 
 extern PyObject *
 _mysql_connect(
-	PyObject *self,
-	PyObject *args,
-	PyObject *kwargs);
+    PyObject *self,
+    PyObject *args,
+    PyObject *kwargs);
 
 extern int
 _mysql_result_object__init__(
-	_mysql_result_object *self,
-	PyObject *args,
-	PyObject *kwargs);
+    _mysql_result_object *self,
+    PyObject *args,
+    PyObject *kwargs);
 
 extern int
 _mysql_field_object__init__(
-	_mysql_field_object *self,
-	PyObject *args,
-	PyObject *kwargs);
+    _mysql_field_object *self,
+    PyObject *args,
+    PyObject *kwargs);
 
 
 extern int

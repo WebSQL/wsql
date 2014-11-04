@@ -14,82 +14,82 @@ static char _mysql_server_init__doc__[] =
 
 static PyObject *
 _mysql_server_init(
-	PyObject *self,
-	PyObject *args,
-	PyObject *kwargs)
+    PyObject *self,
+    PyObject *args,
+    PyObject *kwargs)
 {
-	static char *kwlist[] = {"args", "groups", NULL};
-	char **cmd_args_c=NULL, **groups_c=NULL, *s;
-	Py_ssize_t cmd_argc=0, i, groupc;
-	PyObject *cmd_args=NULL, *groups=NULL, *item;
+    static char *kwlist[] = {"args", "groups", NULL};
+    char **cmd_args_c=NULL, **groups_c=NULL, *s;
+    Py_ssize_t cmd_argc=0, i, groupc;
+    PyObject *cmd_args=NULL, *groups=NULL, *item;
 
-	if (_mysql_server_init_done) {
-		PyErr_SetString(_mysql_programming_error, "already initialized");
-		return NULL;
-	}
+    if (_mysql_server_init_done) {
+        PyErr_SetString(_mysql_programming_error, "already initialized");
+        return NULL;
+    }
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OO", kwlist, &cmd_args, &groups))
-		return NULL;
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OO", kwlist, &cmd_args, &groups))
+        return NULL;
 
 #if MYSQL_VERSION_ID >= 40000
-	if (cmd_args) {
-		if (!PySequence_Check(cmd_args)) {
-			PyErr_SetString(PyExc_TypeError, "args must be a sequence");
-			goto finish;
-		}
-		cmd_argc = PySequence_Size(cmd_args);
-		if (cmd_argc == -1) {
-			PyErr_SetString(PyExc_TypeError, "args could not be sized");
-			goto finish;
-		}
-		cmd_args_c = (char **) PyMem_Malloc(cmd_argc * sizeof(char *));
-		for (i=0; i< cmd_argc; i++) {
-			item = PySequence_GetItem(cmd_args, i);
-			s = PyString_AsString(item);
-			Py_DECREF(item);
-			if (!s) {
-				PyErr_SetString(PyExc_TypeError, "args must contain strings");
-				goto finish;
-			}
-			cmd_args_c[i] = s;
-		}
-	}
-	if (groups) {
-		if (!PySequence_Check(groups)) {
-			PyErr_SetString(PyExc_TypeError, "groups must be a sequence");
-			goto finish;
-		}
-		groupc = PySequence_Size(groups);
-		if (groupc == -1) {
-			PyErr_SetString(PyExc_TypeError, "groups could not be sized");
-			goto finish;
-		}
-		groups_c = (char **) PyMem_Malloc((1+groupc)*sizeof(char *));
-		for (i=0; i< groupc; i++) {
-			item = PySequence_GetItem(groups, i);
-			s = PyString_AsString(item);
-			Py_DECREF(item);
-			if (!s) {
-				PyErr_SetString(PyExc_TypeError, "groups must contain strings");
-				goto finish;
-			}
-			groups_c[i] = s;
-		}
-		groups_c[groupc] = (char *)NULL;
-	}
-	/* even though this may block, don't give up the interpreter lock
-	   so that the server can't be initialized multiple times. */
-	if (mysql_server_init(cmd_argc, cmd_args_c, groups_c)) {
-		_mysql_exception(NULL);
-		goto finish;
-	}
+    if (cmd_args) {
+        if (!PySequence_Check(cmd_args)) {
+            PyErr_SetString(PyExc_TypeError, "args must be a sequence");
+            goto finish;
+        }
+        cmd_argc = PySequence_Size(cmd_args);
+        if (cmd_argc == -1) {
+            PyErr_SetString(PyExc_TypeError, "args could not be sized");
+            goto finish;
+        }
+        cmd_args_c = (char **) PyMem_Malloc(cmd_argc * sizeof(char *));
+        for (i=0; i< cmd_argc; i++) {
+            item = PySequence_GetItem(cmd_args, i);
+            s = PyString_AsString(item);
+            Py_DECREF(item);
+            if (!s) {
+                PyErr_SetString(PyExc_TypeError, "args must contain strings");
+                goto finish;
+            }
+            cmd_args_c[i] = s;
+        }
+    }
+    if (groups) {
+        if (!PySequence_Check(groups)) {
+            PyErr_SetString(PyExc_TypeError, "groups must be a sequence");
+            goto finish;
+        }
+        groupc = PySequence_Size(groups);
+        if (groupc == -1) {
+            PyErr_SetString(PyExc_TypeError, "groups could not be sized");
+            goto finish;
+        }
+        groups_c = (char **) PyMem_Malloc((1+groupc)*sizeof(char *));
+        for (i=0; i< groupc; i++) {
+            item = PySequence_GetItem(groups, i);
+            s = PyString_AsString(item);
+            Py_DECREF(item);
+            if (!s) {
+                PyErr_SetString(PyExc_TypeError, "groups must contain strings");
+                goto finish;
+            }
+            groups_c[i] = s;
+        }
+        groups_c[groupc] = (char *)NULL;
+    }
+    /* even though this may block, don't give up the interpreter lock
+       so that the server can't be initialized multiple times. */
+    if (mysql_server_init(cmd_argc, cmd_args_c, groups_c)) {
+        _mysql_exception(NULL);
+        goto finish;
+    }
 #endif
-	_mysql_server_init_done = 1;
-	Py_RETURN_NONE;
+    _mysql_server_init_done = 1;
+    Py_RETURN_NONE;
   finish:
-	PyMem_Free(groups_c);
-	PyMem_Free(cmd_args_c);
-	return NULL;
+    PyMem_Free(groups_c);
+    PyMem_Free(cmd_args_c);
+    return NULL;
 }
 
 static char _mysql_server_end__doc__[] =
@@ -98,16 +98,16 @@ static char _mysql_server_end__doc__[] =
 
 static PyObject *
 _mysql_server_end(
-	PyObject *self)
+    PyObject *self)
 {
-	if (_mysql_server_init_done) {
+    if (_mysql_server_init_done) {
 #if MYSQL_VERSION_ID >= 40000
-		mysql_server_end();
+        mysql_server_end();
 #endif
-		_mysql_server_init_done = 0;
-		Py_RETURN_NONE;
-	}
-	return _mysql_exception(NULL);
+        _mysql_server_init_done = 0;
+        Py_RETURN_NONE;
+    }
+    return _mysql_exception(NULL);
 }
 
 #if MYSQL_VERSION_ID >= 32314
@@ -116,11 +116,11 @@ static char _mysql_thread_safe__doc__[] =
 
 static PyObject *
 _mysql_thread_safe(
-	PyObject *self)
+    PyObject *self)
 {
 
-	CHECK_SERVER(NULL);
-	return PyLong_FromLong((long)mysql_thread_safe());
+    CHECK_SERVER(NULL);
+    return PyLong_FromLong((long)mysql_thread_safe());
 }
 #endif
 
@@ -132,14 +132,14 @@ static char _mysql_debug__doc__[] =
 
 static PyObject *
 _mysql_debug(
-	PyObject *self,
-	PyObject *args)
+    PyObject *self,
+    PyObject *args)
 {
-	char *debug;
-	if (!PyArg_ParseTuple(args, "s", &debug))
-	    return NULL;
-	mysql_debug(debug);
-	Py_RETURN_NONE;
+    char *debug;
+    if (!PyArg_ParseTuple(args, "s", &debug))
+        return NULL;
+    mysql_debug(debug);
+    Py_RETURN_NONE;
 }
 
 static PyObject *_mysql_NULL;
@@ -150,53 +150,53 @@ static char _mysql_get_client_info__doc__[] =
 
 static PyObject *
 _mysql_get_client_info(
-	PyObject *self)
+    PyObject *self)
 {
-	CHECK_SERVER(NULL);
-	return PyString_FromString(mysql_get_client_info());
+    CHECK_SERVER(NULL);
+    return PyString_FromString(mysql_get_client_info());
 }
 
 static PyMethodDef
 _mysql_methods[] = {
-	{
-		"connect",
-		(PyCFunction)_mysql_connect,
-		METH_VARARGS | METH_KEYWORDS,
-		_mysql_connect__doc__
-	},
-	{
-		"debug",
-		(PyCFunction)_mysql_debug,
-		METH_VARARGS,
-		_mysql_debug__doc__
-	},
-	{
-		"get_client_info",
-		(PyCFunction)_mysql_get_client_info,
-		METH_NOARGS,
-		_mysql_get_client_info__doc__
-	},
+    {
+        "connect",
+        (PyCFunction)_mysql_connect,
+        METH_VARARGS | METH_KEYWORDS,
+        _mysql_connect__doc__
+    },
+    {
+        "debug",
+        (PyCFunction)_mysql_debug,
+        METH_VARARGS,
+        _mysql_debug__doc__
+    },
+    {
+        "get_client_info",
+        (PyCFunction)_mysql_get_client_info,
+        METH_NOARGS,
+        _mysql_get_client_info__doc__
+    },
 #if MYSQL_VERSION_ID >= 32314
-	{
-		"thread_safe",
-		(PyCFunction)_mysql_thread_safe,
-		METH_NOARGS,
-		_mysql_thread_safe__doc__
-	},
+    {
+        "thread_safe",
+        (PyCFunction)_mysql_thread_safe,
+        METH_NOARGS,
+        _mysql_thread_safe__doc__
+    },
 #endif
-	{
-		"server_init",
-		(PyCFunction)_mysql_server_init,
-		METH_VARARGS | METH_KEYWORDS,
-		_mysql_server_init__doc__
-	},
-	{
-		"server_end",
-		(PyCFunction)_mysql_server_end,
-		METH_NOARGS,
-		_mysql_server_end__doc__
-	},
-	{NULL, NULL} /* sentinel */
+    {
+        "server_init",
+        (PyCFunction)_mysql_server_init,
+        METH_VARARGS | METH_KEYWORDS,
+        _mysql_server_init__doc__
+    },
+    {
+        "server_end",
+        (PyCFunction)_mysql_server_end,
+        METH_NOARGS,
+        _mysql_server_end__doc__
+    },
+    {NULL, NULL} /* sentinel */
 };
 
 #define QUOTE(X) _QUOTE(X)
@@ -236,31 +236,31 @@ PyModuleDef _mysql_module =
 PyMODINIT_FUNC
 PYENTRY_FUNC_NAME(void)
 {
-	PyObject *module = NULL;
+    PyObject *module = NULL;
 #ifdef PY3K
     module = PyModule_Create(&_mysql_module);
 #else
-	module = Py_InitModule3("_mysql", _mysql_methods, _mysql__doc__);
+    module = Py_InitModule3("_mysql", _mysql_methods, _mysql__doc__);
 #endif
-	if (!module)
-		PY_MOD_RETURN(NULL); /* this really should never happen */
+    if (!module)
+        PY_MOD_RETURN(NULL); /* this really should never happen */
 
-	/* Populate final object settings */
-	if (PyType_Ready(&_mysql_connection_object_t) < 0) goto error;
-	if (PyType_Ready(&_mysql_result_object_t) < 0) goto error;
-	if (PyType_Ready(&_mysql_field_object_t) < 0) goto error;
+    /* Populate final object settings */
+    if (PyType_Ready(&_mysql_connection_object_t) < 0) goto error;
+    if (PyType_Ready(&_mysql_result_object_t) < 0) goto error;
+    if (PyType_Ready(&_mysql_field_object_t) < 0) goto error;
 
-	/* Module constants */
-	if (PyModule_AddObject(module, "version_info",
-	                       PyRun_String(QUOTE(version_info),
-	                                    Py_eval_input,
-	                                    PyModule_GetDict(module),
-	                                    PyModule_GetDict(module))) < 0) goto error;
+    /* Module constants */
+    if (PyModule_AddObject(module, "version_info",
+                           PyRun_String(QUOTE(version_info),
+                                        Py_eval_input,
+                                        PyModule_GetDict(module),
+                                        PyModule_GetDict(module))) < 0) goto error;
 
-	if (PyModule_AddStringConstant(module, "__version__", QUOTE(__version__)) < 0) goto error;
+    if (PyModule_AddStringConstant(module, "__version__", QUOTE(__version__)) < 0) goto error;
 
-	if (_mysql_exceptions_add(module) < 0) goto error;
-	if (_mysql_constants_add(module) < 0) goto error;
+    if (_mysql_exceptions_add(module) < 0) goto error;
+    if (_mysql_constants_add(module) < 0) goto error;
 
     PY_MOD_RETURN(module);
   error:

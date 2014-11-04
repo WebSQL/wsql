@@ -16,45 +16,45 @@ PyObject *_mysql_error_map;
 PyObject *
 _mysql_exception(_mysql_connection_object *c)
 {
-	PyObject *error_value, *error_class;
-	int error_code;
+    PyObject *error_value, *error_class;
+    int error_code;
 
-	if (!(error_value = PyTuple_New(2)))
-	    return NULL;
+    if (!(error_value = PyTuple_New(2)))
+        return NULL;
 
-	if (!_mysql_server_init_done || !c) {
-		error_class = _mysql_internal_error;
-		PyTuple_SET_ITEM(error_value, 0, PyLong_FromLong(-1L));
-		PyTuple_SET_ITEM(error_value, 1, PyString_FromString("server not initialized"));
-		PyErr_SetObject(error_class, error_value);
-		Py_DECREF(error_value);
-		return NULL;
-	}
-
-	error_code = mysql_errno(&(c->connection));
-	if (!error_code) {
-		error_class = _mysql_interface_error;
+    if (!_mysql_server_init_done || !c) {
+        error_class = _mysql_internal_error;
+        PyTuple_SET_ITEM(error_value, 0, PyLong_FromLong(-1L));
+        PyTuple_SET_ITEM(error_value, 1, PyString_FromString("server not initialized"));
+        PyErr_SetObject(error_class, error_value);
+        Py_DECREF(error_value);
+        return NULL;
     }
-	else if (error_code > CR_MAX_ERROR) {
-		PyTuple_SET_ITEM(error_value, 0, PyLong_FromLong(-1L));
-		PyTuple_SET_ITEM(error_value, 1, PyString_FromString("error totally whack"));
-		PyErr_SetObject(_mysql_interface_error, error_value);
-		Py_DECREF(error_value);
-		return NULL;
-	}
-	else {
-		PyObject *py_error = PyLong_FromLong(error_code);
-		error_class = PyDict_GetItem(_mysql_error_map, py_error);
-		Py_DECREF(py_error);
-		if (!error_class)
-			error_class = error_code < ER_ERROR_FIRST ? _mysql_internal_error : _mysql_operational_error;
-	}
-	TRACE2("%p, %d", c, error_code);
-	PyTuple_SET_ITEM(error_value, 0, PyLong_FromLong((long)error_code));
-	PyTuple_SET_ITEM(error_value, 1, PyString_FromString(mysql_error(&(c->connection))));
-	PyErr_SetObject(error_class, error_value);
-	Py_DECREF(error_value);
-	return NULL;
+
+    error_code = mysql_errno(&(c->connection));
+    if (!error_code) {
+        error_class = _mysql_interface_error;
+    }
+    else if (error_code > CR_MAX_ERROR) {
+        PyTuple_SET_ITEM(error_value, 0, PyLong_FromLong(-1L));
+        PyTuple_SET_ITEM(error_value, 1, PyString_FromString("error totally whack"));
+        PyErr_SetObject(_mysql_interface_error, error_value);
+        Py_DECREF(error_value);
+        return NULL;
+    }
+    else {
+        PyObject *py_error = PyLong_FromLong(error_code);
+        error_class = PyDict_GetItem(_mysql_error_map, py_error);
+        Py_DECREF(py_error);
+        if (!error_class)
+            error_class = error_code < ER_ERROR_FIRST ? _mysql_internal_error : _mysql_operational_error;
+    }
+    TRACE2("%p, %d", c, error_code);
+    PyTuple_SET_ITEM(error_value, 0, PyLong_FromLong((long)error_code));
+    PyTuple_SET_ITEM(error_value, 1, PyString_FromString(mysql_error(&(c->connection))));
+    PyErr_SetObject(error_class, error_value);
+    Py_DECREF(error_value);
+    return NULL;
 }
 
 int
