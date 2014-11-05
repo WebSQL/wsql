@@ -115,7 +115,7 @@ _mysql_exceptions_add(PyObject* module)
         "_mysql.DataError",
         "Exception raised for errors that are due to problems with the \n" \
         "processed data like division by zero, numeric value out of range, etc.",
-        _mysql_error,
+        _mysql_database_error,
         0))) goto error;
 
 

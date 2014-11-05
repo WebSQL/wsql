@@ -49,6 +49,13 @@ _mysql_connection_object__init__(
                      &nonblocking))
         return -1;
 
+    if (nonblocking) {
+#ifndef HAVE_ASYNCIO
+        PyErr_SetString(_mysql_not_supported_error, "client library does not have non-blocking operations support");
+        return -1;
+#endif
+    }
+
 #define GET_ITEM_STRING(k, t, d) \
 { t = PyMapping_GetItemString(d, #k);\
   if (t) { k = PyString_AsString(t); Py_DECREF(t);} \
@@ -97,16 +104,11 @@ _mysql_connection_object__init__(
     if (nonblocking) {
 #ifdef HAVE_ASYNCIO
         if (!mysql_real_connect_nonblocking_init(&(self->connection),
-            host, user, passwd, db, port, unix_socket, client_flag)) {
+                host, user, passwd, db, port, unix_socket, client_flag))
             conn = NULL;
-        }
-#else
-        PyErr_SetString(_mysql_not_supported_error, "client library does not have non-blocking operations support");
-        return -1;
 #endif
     } else {
-        conn = mysql_real_connect(&(self->connection),
-            host, user, passwd, db, port, unix_socket, client_flag);
+        conn = mysql_real_connect(&(self->connection), host, user, passwd, db, port, unix_socket, client_flag);
     }
 
     self->autocommit = self->connection.server_capabilities & CLIENT_TRANSACTIONS ? 1 : 0;
