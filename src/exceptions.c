@@ -1,6 +1,6 @@
 #include "mysqlmod.h"
 
-PyObject *_mysql_base_error;
+PyObject *_mysql_standard_error;
 PyObject *_mysql_warning;
 PyObject *_mysql_error;
 PyObject *_mysql_database_error;
@@ -57,10 +57,25 @@ _mysql_exception(_mysql_connection_object *c)
     return NULL;
 }
 
+const char _mysql_exceptions__doc__[] =
+"All Exceptions according to DB API 2.0\n";
+
+#ifdef PY3K
+PyModuleDef _mysql_exceptions_module =
+{
+    PyModuleDef_HEAD_INIT,
+    "_mysql.exceptions",        /* name of module */
+    _mysql_exceptions__doc__,   /* module documentation, may be NULL */
+    -1,                         /* size of per-interpreter state of the module,
+                                or -1 if the module keeps state in global variables. */
+    NULL, NULL, NULL, NULL, NULL
+};
+#endif  // PY3K
+
 int
 _mysql_exceptions_add(PyObject* module)
 {
-    _mysql_base_error = NULL;
+    _mysql_standard_error = NULL;
     _mysql_warning = NULL;
     _mysql_error = NULL;
     _mysql_database_error = NULL;
@@ -73,19 +88,26 @@ _mysql_exceptions_add(PyObject* module)
     _mysql_not_supported_error = NULL;
     _mysql_error_map = NULL;
 
-    PyObject * warning_base = NULL;
+    PyObject * warning_base = NULL, *exceptions = NULL;
+#ifdef PY3K
+    exceptions = PyModule_Create(&_mysql_exceptions_module);
+#else
+    exceptions = Py_InitModule3("_mysql.exceptions", NULL, _mysql_exceptions__doc__);
+#endif
+    if (!exceptions)
+        return -1;
 
-    if (! (_mysql_base_error = PyErr_NewExceptionWithDoc(
-        "_mysql.MySQLError",
+    if (! (_mysql_standard_error = PyErr_NewExceptionWithDoc(
+        "_mysql.exceptions.StandardError",
         "Exception related to operation with MySQL.",
         PyExc_Exception,
         0))) goto error;
 
 
-    if (!(warning_base = Py_BuildValue("(OO)", PyExc_Warning, _mysql_base_error))) goto error;
+    if (!(warning_base = Py_BuildValue("(OO)", PyExc_Warning, _mysql_standard_error))) goto error;
 
     if (!(_mysql_warning = PyErr_NewExceptionWithDoc(
-        "_mysql.Warning",
+        "_mysql.exceptions.Warning",
         "Exception raised for important warnings like data truncations while inserting, etc.",
         warning_base,
         0))) goto error;
@@ -94,25 +116,25 @@ _mysql_exceptions_add(PyObject* module)
     warning_base = NULL;
 
     if (!(_mysql_error = PyErr_NewExceptionWithDoc(
-        "_mysql.Error",
+        "_mysql.exceptions.Error",
         "Exception that is the base class of all other error exceptions (not Warning).",
-        _mysql_base_error,
+        _mysql_standard_error,
         0))) goto error;
 
     if (!(_mysql_interface_error = PyErr_NewExceptionWithDoc(
-        "_mysql.InterfaceError",
+        "_mysql.exceptions.InterfaceError",
         "Exception raised for errors that are related to the database interface rather than the database itself.",
         _mysql_error,
         0))) goto error;
 
     if (!(_mysql_database_error = PyErr_NewExceptionWithDoc(
-        "_mysql.DatabaseError",
+        "_mysql.exceptions.DatabaseError",
         "Exception raised for errors that are related to the database.",
         _mysql_error,
         0))) goto error;
 
     if (!(_mysql_data_error = PyErr_NewExceptionWithDoc(
-        "_mysql.DataError",
+        "_mysql.exceptions.DataError",
         "Exception raised for errors that are due to problems with the \n" \
         "processed data like division by zero, numeric value out of range, etc.",
         _mysql_database_error,
@@ -120,7 +142,7 @@ _mysql_exceptions_add(PyObject* module)
 
 
     if (!(_mysql_operational_error = PyErr_NewExceptionWithDoc(
-        "_mysql.OperationalError",
+        "_mysql.exceptions.OperationalError",
         "Exception raised for errors that are related to the database's\n" \
         "operation and not necessarily under the control of the programmer," \
         "e.g. an unexpected disconnect occurs, the data source name is not" \
@@ -131,7 +153,7 @@ _mysql_exceptions_add(PyObject* module)
 
 
     if (!(_mysql_integrity_error = PyErr_NewExceptionWithDoc(
-        "_mysql.IntegrityError",
+        "_mysql.exceptions.IntegrityError",
         "Exception raised when the relational integrity of the database" \
         "is affected, e.g. a foreign key check fails, duplicate key, etc.",
         _mysql_database_error,
@@ -139,14 +161,14 @@ _mysql_exceptions_add(PyObject* module)
 
 
     if (!(_mysql_internal_error = PyErr_NewExceptionWithDoc(
-        "_mysql.InternalError",
+        "_mysql.exceptions.InternalError",
         "Exception raised when the database encounters an internal" \
         "error, e.g. the cursor is not valid anymore, the transaction is out of sync, etc.",
         _mysql_database_error,
         0))) goto error;
 
     if (!(_mysql_programming_error = PyErr_NewExceptionWithDoc(
-        "_mysql.ProgrammingError",
+        "_mysql.exceptions.ProgrammingError",
         "Exception raised for programming errors, e.g. table not found" \
         "or already exists, syntax error in the SQL statement, wrong number" \
         "of parameters specified, etc.",
@@ -155,7 +177,7 @@ _mysql_exceptions_add(PyObject* module)
 
 
     if (!(_mysql_not_supported_error = PyErr_NewExceptionWithDoc(
-        "_mysql.NotSupportedError",
+        "_mysql.exceptions.NotSupportedError",
         "Exception raised in case a method or database API was used" \
         "which is not supported by the database, e.g. requesting a" \
         ".rollback() on a connection that does not support transaction or" \
@@ -163,17 +185,17 @@ _mysql_exceptions_add(PyObject* module)
         _mysql_database_error,
         0))) goto error;
 
-    if (PyModule_AddObject(module, "MySQLError", _mysql_base_error) < 0) goto error;
-    if (PyModule_AddObject(module, "Warning", _mysql_warning) < 0) goto error;
-    if (PyModule_AddObject(module, "Error", _mysql_error) < 0) goto error;
-    if (PyModule_AddObject(module, "DatabaseError", _mysql_database_error) < 0) goto error;
-    if (PyModule_AddObject(module, "InterfaceError", _mysql_interface_error) < 0) goto error;
-    if (PyModule_AddObject(module, "DataError", _mysql_data_error) < 0) goto error;
-    if (PyModule_AddObject(module, "OperationalError", _mysql_operational_error) < 0) goto error;
-    if (PyModule_AddObject(module, "IntegrityError", _mysql_integrity_error) < 0) goto error;
-    if (PyModule_AddObject(module, "InternalError", _mysql_internal_error) < 0) goto error;
-    if (PyModule_AddObject(module, "ProgrammingError", _mysql_programming_error) < 0) goto error;
-    if (PyModule_AddObject(module, "NotSupportedError", _mysql_not_supported_error) < 0) goto error;
+    if (PyModule_AddObject(exceptions, "MySQLError", _mysql_base_error) < 0) goto error;
+    if (PyModule_AddObject(exceptions, "Warning", _mysql_warning) < 0) goto error;
+    if (PyModule_AddObject(exceptions, "Error", _mysql_error) < 0) goto error;
+    if (PyModule_AddObject(exceptions, "DatabaseError", _mysql_database_error) < 0) goto error;
+    if (PyModule_AddObject(exceptions, "InterfaceError", _mysql_interface_error) < 0) goto error;
+    if (PyModule_AddObject(exceptions, "DataError", _mysql_data_error) < 0) goto error;
+    if (PyModule_AddObject(exceptions, "OperationalError", _mysql_operational_error) < 0) goto error;
+    if (PyModule_AddObject(exceptions, "IntegrityError", _mysql_integrity_error) < 0) goto error;
+    if (PyModule_AddObject(exceptions, "InternalError", _mysql_internal_error) < 0) goto error;
+    if (PyModule_AddObject(exceptions, "ProgrammingError", _mysql_programming_error) < 0) goto error;
+    if (PyModule_AddObject(exceptions, "NotSupportedError", _mysql_not_supported_error) < 0) goto error;
 
     if (!(_mysql_error_map = PyDict_New())) goto error;
 
@@ -210,6 +232,8 @@ _mysql_exceptions_add(PyObject* module)
     PyDict_SetItem(_mysql_error_map, PyLong_FromLong(ER_FEATURE_DISABLED), _mysql_not_supported_error);
     PyDict_SetItem(_mysql_error_map, PyLong_FromLong(ER_UNKNOWN_STORAGE_ENGINE), _mysql_not_supported_error);
 
+    if (PyModule_AddObject(module, "exceptions", exceptions) < 0) goto error;
+
     return 0;
 error:
     Py_XDECREF(_mysql_base_error);
@@ -225,5 +249,6 @@ error:
     Py_XDECREF(_mysql_not_supported_error);
     Py_XDECREF(_mysql_error_map);
     Py_XDECREF(warning_base);
+    Py_XDECREF(exceptions);
     return -1;
 }
