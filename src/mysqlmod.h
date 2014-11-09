@@ -60,7 +60,7 @@ extern int _mysql_server_init_done;
 #define CHECK_SERVER(x) if (!_mysql_server_init_done) _mysql_server_init_done = 1
 #endif
 
-extern PyObject *_mysql_base_error;
+extern PyObject *_mysql_standard_error;
 extern PyObject *_mysql_warning;
 extern PyObject *_mysql_error;
 extern PyObject *_mysql_database_error;
