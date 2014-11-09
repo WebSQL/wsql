@@ -81,6 +81,7 @@ _mysql_result_object__init__(
 
     n = mysql_num_fields(result);
     self->num_fields = n;
+    self->row_index = 0;
     self->fields = _mysql_result_object_get_fields(self, n);
     return 0;
 }
@@ -183,6 +184,7 @@ _mysql_result_object_fetch_row(
         row = mysql_fetch_row(self->result);
         Py_END_ALLOW_THREADS;
     }
+    self->row_index++;
     return _mysql_convert_row(self, row);
 }
 
@@ -344,8 +346,10 @@ _mysql_result_object_fetch_row_async(
         row = Py_None;
         Py_INCREF(row);
     }
-    else
+    else {
+        self->row_index++;
         row = _mysql_convert_row(self, mysql_row);
+    }
 
     if (!(result = PyTuple_New(2)))
         goto error;
@@ -483,6 +487,13 @@ static struct PyMemberDef _mysql_result_object_members[] = {
         offsetof(_mysql_result_object, use),
         READONLY,
         "True if mysql_use_result() was used; False if mysql_store_result() was used"
+    },
+    {
+        "row_index",
+        T_LONGLONG,
+        offsetof(_mysql_result_object, row_index),
+        READONLY,
+        "The current row_index"
     },
     {NULL} /* Sentinel */
 };
