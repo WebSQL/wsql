@@ -185,7 +185,7 @@ _mysql_exceptions_add(PyObject* module)
         _mysql_database_error,
         0))) goto error;
 
-    if (PyModule_AddObject(exceptions, "MySQLError", _mysql_base_error) < 0) goto error;
+    if (PyModule_AddObject(exceptions, "StandardError", _mysql_standard_error) < 0) goto error;
     if (PyModule_AddObject(exceptions, "Warning", _mysql_warning) < 0) goto error;
     if (PyModule_AddObject(exceptions, "Error", _mysql_error) < 0) goto error;
     if (PyModule_AddObject(exceptions, "DatabaseError", _mysql_database_error) < 0) goto error;
@@ -236,7 +236,7 @@ _mysql_exceptions_add(PyObject* module)
 
     return 0;
 error:
-    Py_XDECREF(_mysql_base_error);
+    Py_XDECREF(_mysql_standard_error);
     Py_XDECREF(_mysql_warning);
     Py_XDECREF(_mysql_error);
     Py_XDECREF(_mysql_database_error);

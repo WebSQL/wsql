@@ -104,7 +104,7 @@ _mysql_connection_object__init__(
     if (nonblocking) {
 #ifdef HAVE_ASYNCIO
         if (!mysql_real_connect_nonblocking_init(&(self->connection),
-                host, user, passwd, db, port, unix_socket, client_flag))
+                host, user, password, db, port, socket_name, client_flag))
             conn = NULL;
 #endif
     } else {
