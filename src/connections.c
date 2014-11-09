@@ -16,17 +16,15 @@ _mysql_connection_object__init__(
     char *key = NULL, *cert = NULL, *ca = NULL,
          *capath = NULL, *cipher = NULL;
 #endif
-    char *host = NULL, *user = NULL, *passwd = NULL,
-         *db = NULL, *unix_socket = NULL;
+    char *host = NULL, *user = NULL, *password = NULL,
+         *db = NULL, *socket_name = NULL,
+         *init_command=NULL, *read_default_file=NULL, *read_default_group=NULL;
     unsigned int port = 0, client_flag = 0, connect_timeout = 0;
-    int nonblocking = 0, compress = -1, named_pipe = -1, local_infile = -1;
-    char *init_command=NULL,
-         *read_default_file=NULL,
-         *read_default_group=NULL;
+    int nonblocking = 0, compress = -1, local_infile = -1;
 
     static char *kwlist[] = {
-        "host", "user", "passwd", "db", "port", "unix_socket",
-        "connect_timeout", "compress", "named_pipe", "init_command",
+        "host", "user", "password", "database", "port", "socket_name",
+        "connect_timeout", "compress", "init_command",
         "read_default_file", "read_default_group", "client_flag",
         "ssl", "local_infile", "nonblocking",
         NULL
@@ -36,12 +34,12 @@ _mysql_connection_object__init__(
     self->autocommit = 1;
     CHECK_SERVER(-1);
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|ssssIsIiisssIOii:connect",
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|ssssIsIisssIOii:connect",
                      kwlist,
-                     &host, &user, &passwd, &db,
-                     &port, &unix_socket,
+                     &host, &user, &password, &db,
+                     &port, &socket_name,
                      &connect_timeout,
-                     &compress, &named_pipe,
+                     &compress,
                      &init_command, &read_default_file,
                      &read_default_group,
                      &client_flag, &ssl,
@@ -85,8 +83,10 @@ _mysql_connection_object__init__(
     }
     if (connect_timeout)
         mysql_options(&(self->connection), MYSQL_OPT_CONNECT_TIMEOUT, (char *)&connect_timeout);
-    if (named_pipe != -1)
+#ifdef _WIN32
+    if (socket_name != NULL)
         mysql_options(&(self->connection), MYSQL_OPT_NAMED_PIPE, 0);
+#endif
     if (init_command != NULL)
         mysql_options(&(self->connection), MYSQL_INIT_COMMAND, init_command);
     if (read_default_file != NULL)
@@ -108,7 +108,7 @@ _mysql_connection_object__init__(
             conn = NULL;
 #endif
     } else {
-        conn = mysql_real_connect(&(self->connection), host, user, passwd, db, port, unix_socket, client_flag);
+        conn = mysql_real_connect(&(self->connection), host, user, password, db, port, socket_name, client_flag);
     }
 
     self->autocommit = self->connection.server_capabilities & CLIENT_TRANSACTIONS ? 1 : 0;
@@ -140,7 +140,7 @@ char _mysql_connect__doc__[] =
 "user\n" \
 "  string, user to connect as\n" \
 "\n" \
-"passwd\n" \
+"password\n" \
 "  string, password to use\n" \
 "\n" \
 "db\n" \
@@ -149,8 +149,8 @@ char _mysql_connect__doc__[] =
 "port\n" \
 "  integer, TCP/IP port to connect to\n" \
 "\n" \
-"unix_socket\n" \
-"  string, location of unix_socket (UNIX-ish only)\n" \
+"socket_name\n" \
+"  string, location of unix-socket or windows named pipe\n" \
 "\n" \
 "connect_timeout\n" \
 "  number of seconds to wait before the connection\n" \
@@ -158,9 +158,6 @@ char _mysql_connect__doc__[] =
 "\n" \
 "compress\n" \
 "  if set, gzip compression is enabled\n" \
-"\n" \
-"named_pipe\n" \
-"  if set, connect to server via named pipe (Windows only)\n" \
 "\n" \
 "init_command\n" \
 "  command which is run once the connection is created\n" \
