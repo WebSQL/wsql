@@ -7,57 +7,108 @@ create Cursors direction; use connection.cursor() instead.
 
 """
 
-import re
-import sys
-import weakref
-from MySQLdb.converters import get_codec
+from ._mysql import constants
+from ._mysql import exceptions
+from .converters import get_codec
 from warnings import warn
+import asyncio
+import re
+import weakref
+
 
 INSERT_VALUES = re.compile(r"(?P<start>.+values\s*)"
                            r"(?P<values>\(((?<!\\)'[^\)]*?\)[^\)]*(?<!\\)?'|[^\(\)]|(?:\([^\)]*\)))+\))"
                            r"(?P<end>.*)", re.I)
 
 
-class Cursor(object):
-
-    """A base for Cursor classes. Useful attributes:
-
-    description
-        A tuple of DB API 7-tuples describing the columns in
-        the last executed query; see PEP-249 for details.
-
-    arraysize
-        default number of rows fetchmany() will fetch
-
+class CursorBase(object):
+    """
+    A base for Cursor classes.
     """
 
-    from MySQLdb.exceptions import MySQLError, Warning, Error, InterfaceError, \
-         DatabaseError, DataError, OperationalError, IntegrityError, \
-         InternalError, ProgrammingError, NotSupportedError
-
+    use_result = False
     _defer_warnings = False
-    _fetch_type = None
+
+    ProgrammingError = exceptions.ProgrammingError
+    StandardError = exceptions.StandardError
+    NotSupportedError = exceptions.NotSupportedError
 
     def __init__(self, connection, encoders, decoders, row_formatter):
-        self.connection = weakref.proxy(connection)
-        self.description_flags = None
-        self.rowcount = -1
-        self.arraysize = 1
-        self._executed = None
-        self.lastrowid = None
         self.messages = []
+        self.encoders = encoders
+        self.decoders = decoders
+        self.row_formatter = row_formatter
         self.errorhandler = connection.errorhandler
+        self.arraysize = 1
+        self._rowcount = -1
+        self._connection = weakref.ref(connection)
+        self._executed = None
         self._result = None
         self._pending_results = []
         self._warnings = 0
         self._info = None
-        self.rownumber = None
-        self.maxrows = 0
-        self.encoders = encoders
-        self.decoders = decoders
         self._row_decoders = ()
-        self.row_formatter = row_formatter
-        self.use_result = False
+
+    def _check_executed(self):
+        """Ensure that .execute() has been called."""
+        if not self._executed:
+            self.errorhandler(self.ProgrammingError("execute() first"))
+
+    def _push(self):
+        """store current result"""
+        if self._result is not None:
+            result = self._result
+            self._result = None
+            self._pending_results.append(result)
+
+    def _pop(self):
+        if self._pending_results:
+            self._result = self._pending_results[0]
+            del self._pending_results[0]
+            return True
+        return False
+
+    def _acquire_result(self, connection=None):
+        connection = connection or self._connection()
+        result = connection.get_result(self.use_result)
+        if result is not None:
+            decoders = self.decoders
+            self._row_decoders = tuple((get_codec(connection, field, decoders) for field in result.fields))
+            self._rowcount = result.num_rows
+            self._result = result
+
+    def _release_result(self):
+        if self._result is not None:
+            result = self._result
+            self._result = None
+            self._rowcount = -1
+            self._row_decoders = ()
+            return result
+
+    def _encode(self, connection, obj):
+        """
+        Given an object obj, returns an SQL literal as a string.
+        Non-standard.
+        :param obj: object to encode
+        :return string literal
+        """
+        for encoder in self.encoders:
+            f = encoder(obj)
+            if f:
+                return f(connection, obj)
+
+        self.errorhandler(self.NotSupportedError("could not encode as SQL", obj))
+
+    @property
+    def connection(self):
+        """
+            Get the database connection.
+            Raises ProgrammingError if the connection has been closed.
+        """
+        connection = self._connection()
+        if connection is None:
+            self.errorhandler(self.ProgrammingError("connection lost"))
+        return connection
 
     @property
     def description(self):
@@ -65,176 +116,141 @@ class Cursor(object):
             return self._result.description
         return None
 
-    def _flush(self):
-        """_flush() reads to the end of the current result set, buffering what
-        it can, and then releases the result set."""
-        if self._result:
-            self._result.flush()
-            self._result = None
-        db = self._get_db()
-        while db.next_result():
-            result = Result(self)
-            result.flush()
-            self._pending_results.append(result)
+    @property
+    def rowcount(self):
+        """
+        :return: the number of rows that the last .execute*() produced (for DQL statements like SELECT)
+                 or affected (for DML statements like UPDATE or INSERT)
+        """
+        return self._rowcount
 
-    def __del__(self):
-        self.close()
-        self.errorhandler = None
-        self._result = None
-        del self._pending_results[:]
-
-    def _clear(self):
+    @property
+    def rownumber(self):
+        """
+        :return:  the current 0-based index of the cursor in the result set or None if the index cannot be determined.
+        """
         if self._result:
-            self._result.clear()
-            self._result = None
-        for result in self._pending_results:
-            result.clear()
-        del self._pending_results[:]
-        db = self._get_db()
-        while db.next_result():
-            result = db.get_result(True)
-            if result:
-                result.clear()
-        del self.messages[:]
+            return self._result.tell()
+
+    @property
+    def lastrowid(self):
+        """
+        :return: he rowid of the last modified row
+                 (most databases return a rowid only when a single INSERT operation is performed).
+                 If the operation does not set a rowid or if the database does not support rowids,
+                 this attribute should be set to None.
+        """
+        return self.connection.last_insert_id
+
+    @staticmethod
+    def setinputsizes(*args):
+        """Does nothing, required by DB API."""
+        pass
+
+    @staticmethod
+    def setoutputsizes(*args):
+        """Does nothing, required by DB API."""
+        pass
+
+
+class Cursor(CursorBase):
+    use_result = False
+
+    def _release_result(self):
+        result = super()._release_result()
+        if result is not None:
+            try:
+                while result.fetch_row() is not None:
+                    pass
+                result.free()
+            except self.StandardError:
+                pass
 
     def close(self):
-        """Close the cursor. No further queries will be possible."""
-        if not self.connection:
-            return
-
-        self._flush()
-        try:
-            while self.nextset():
-                pass
-        except:
+        while self.nextset():
             pass
-        self.connection = None
+        self._result = None
 
-    def _check_executed(self):
-        """Ensure that .execute() has been called."""
-        if not self._executed:
-            self.errorhandler(self, self.ProgrammingError, "execute() first")
-
-    def _warning_check(self):
+    def warning_check(self):
         """Check for warnings, and report via the warnings module."""
-        from warnings import warn
-        if self._warnings:
-            warnings = self._get_db()._show_warnings()
+        connection = self.connection
+        if connection.warning_count:
+            warnings = connection.show_warnings()
             if warnings:
-                # This is done in two loops in case
-                # Warnings are set to raise exceptions.
-                for warning in warnings:
-                    self.messages.append((self.Warning, warning))
-                for warning in warnings:
-                    warn(warning[-1], self.Warning, 3)
+                #TODO mysql warning is a tuple, but mysql does not handle it
+                for warning in map(connection.Warning, warnings):
+                    self.messages.append(warning)
+                    warn(warning, stacklevel=3)
             elif self._info:
-                self.messages.append((self.Warning, self._info))
-                warn(self._info, self.Warning, 3)
+                warning = connection.Warning(self._info)
+                self.messages.append(warning)
+                warn(warning, stacklevel=3)
 
     def nextset(self):
-        """Advance to the next result set.
-
+        """
+        Advance to the next result set.
         Returns False if there are no more result sets.
         """
-        db = self._get_db()
-        self._result.clear()
-        self._result = None
-        if self._pending_results:
-            self._result = self._pending_results[0]
-            del self._pending_results[0]
+        self._release_result()
+        if self._pop():
             return True
-        if db.next_result():
-            self._result = Result(self)
+
+        connection = self.connection
+        if connection.next_result():
+            self._acquire_result()
             return True
         return False
 
-    def setinputsizes(self, *args):
-        """Does nothing, required by DB API."""
-
-    def setoutputsizes(self, *args):
-        """Does nothing, required by DB API."""
-
-    def _get_db(self):
-        """Get the database connection.
-
-        Raises ProgrammingError if the connection has been closed."""
-        if not self.connection:
-            self.errorhandler(self, self.ProgrammingError, "cursor closed")
-        return self.connection._db
-
     def execute(self, query, args=None):
-        """Execute a query.
-
-        query -- string, query to execute on server
-        args -- optional sequence or mapping, parameters to use with query.
-
-        Note: If args is a sequence, then %s must be used as the
-        parameter placeholder in the query. If a mapping is used,
-        %(key)s must be used as the placeholder.
-
-        Returns long integer rows affected, if any
-
         """
-        db = self._get_db()
-        self._clear()
-        charset = db.character_set_name()
-        if isinstance(query, unicode):
+        Execute a query.
+        :param query: string, query to execute on server
+        :param args: optional sequence or mapping, parameters to use with query.
+                     Note: If args is a sequence, then %s must be used as the
+                     parameter placeholder in the query. If a mapping is used,
+                     %(key)s must be used as the placeholder.
+        """
+        self._push()
+        connection = self.connection
+        charset = connection.charset
+        if isinstance(query, str):
             query = query.encode(charset)
         try:
             if args is not None:
-                query = query % tuple(( get_codec(a, self.encoders)(db, a) for a in args ))
+                query = query % tuple((get_codec(connection, a, self.encoders)(connection, a) for a in args))
             self._query(query)
-        except TypeError, msg:
-            if msg.args[0] in ("not enough arguments for format string",
-                               "not all arguments converted"):
-                self.messages.append((self.ProgrammingError, msg.args[0]))
-                self.errorhandler(self, self.ProgrammingError, msg.args[0])
-            else:
-                self.messages.append((TypeError, msg))
-                self.errorhandler(self, TypeError, msg)
-        except:
-            exc, value, traceback = sys.exc_info()
-            self.messages.append((exc, value))
-            self.errorhandler(self, exc, value)
-            del traceback
+        except TypeError as e:
+            self.errorhandler(self.ProgrammingError(str(e)))
+        except Exception as e:
+            self.errorhandler(e)
 
         if not self._defer_warnings:
-            self._warning_check()
-        return None
+            self.warning_check()
 
     def executemany(self, query, args):
-        """Execute a multi-row query.
-
-        query
-
-            string, query to execute on server
-
-        args
-
-            Sequence of sequences or mappings, parameters to use with
-            query.
-
-        Returns long integer rows affected, if any.
-
+        """
+        Execute a multi-row query.
         This method improves performance on multiple-row INSERT and
         REPLACE. Otherwise it is equivalent to looping over args with
         execute().
 
+        :param query: string, query to execute on server
+        :param args: Sequence of sequences or mappings, parameters to use with query.
         """
-        db = self._get_db()
-        self._clear()
+        connection = self.connection
         if not args:
             return
-        charset = self.connection.character_set_name()
-        if isinstance(query, unicode):
+
+        charset = connection.charset
+        if isinstance(query, str):
             query = query.encode(charset)
         matched = INSERT_VALUES.match(query)
         if not matched:
             rowcount = 0
             for row in args:
                 self.execute(query, row)
-                rowcount += self.rowcount
-            self.rowcount = rowcount
+                rowcount += self._rowcount
+            self._rowcount = rowcount
             return
 
         start = matched.group('start')
@@ -242,76 +258,42 @@ class Cursor(object):
         end = matched.group('end')
 
         try:
-            sql_params = ( values % tuple(( get_codec(a, self.encoders)(db, a) for a in row )) for row in args )
-            multirow_query = '\n'.join([start, ',\n'.join(sql_params), end])
-            self._query(multirow_query)
-
-        except TypeError, msg:
-            if msg.args[0] in ("not enough arguments for format string",
-                               "not all arguments converted"):
-                self.messages.append((self.ProgrammingError, msg.args[0]))
-                self.errorhandler(self, self.ProgrammingError, msg.args[0])
-            else:
-                self.messages.append((TypeError, msg))
-                self.errorhandler(self, TypeError, msg)
-        except:
-            exc, value, traceback = sys.exc_info()
-            del traceback
-            self.errorhandler(self, exc, value)
+            sql_params = tuple(values % tuple(get_codec(connection, a, self.encoders)(connection, a) for a in row) for row in args)
+            multi_row_query = '\n'.join([start, ',\n'.join(sql_params), end])
+            self._query(multi_row_query)
+        except TypeError as e:
+            self.errorhandler(self.ProgrammingError(e))
+        except Exception as e:
+            self.errorhandler(e)
 
         if not self._defer_warnings:
-            self._warning_check()
-        return None
+            self.warning_check()
 
     def callproc(self, procname, args=()):
-        """Execute stored procedure procname with args
+        """
+        Execute stored procedure procname with args
 
-        procname
-            string, name of procedure to execute on server
+        :param procname: string, name of procedure to execute on server
+        :param args: Sequence of parameters to use with procedure
 
-        args
-            Sequence of parameters to use with procedure
-
-        Returns the original args.
-
-        Compatibility warning: PEP-249 specifies that any modified
-        parameters must be returned. This is currently impossible
-        as they are only available by storing them in a server
-        variable and then retrieved by a query. Since stored
-        procedures return zero or more result sets, there is no
-        reliable way to get at OUT or INOUT parameters via callproc.
-        The server variables are named @_procname_n, where procname
-        is the parameter above and n is the position of the parameter
-        (from zero). Once all result sets generated by the procedure
-        have been fetched, you can issue a SELECT @_procname_0, ...
-        query using .execute() to get any OUT or INOUT values.
-
-        Compatibility warning: The act of calling a stored procedure
-        itself creates an empty result set. This appears after any
-        result sets generated by the procedure. This is non-standard
-        behavior with respect to the DB-API. Be sure to use nextset()
-        to advance through all result sets; otherwise you may get
-        disconnected.
+        :return the original args. (update args for inout parameters additional performance penalty, skip it)
         """
 
-        db = self._get_db()
-        charset = self.connection.character_set_name()
+        connection = self.connection
+        charset = connection.charset
         for index, arg in enumerate(args):
-            query = "SET @_%s_%d=%s" % (procname, index,
-                                        self.connection.literal(arg))
-            if isinstance(query, unicode):
+            query = "SET @_%s_%d=%s" % (procname, index, self._encode(connection, arg))
+            if isinstance(query, str):
                 query = query.encode(charset)
             self._query(query)
             self.nextset()
 
-        query = "CALL %s(%s)" % (procname,
-                                 ','.join(['@_%s_%d' % (procname, i)
-                                           for i in range(len(args))]))
-        if isinstance(query, unicode):
+        query = "CALL %s(%s)" % (procname, ','.join(['@_%s_%d' % (procname, i) for i in range(len(args))]))
+        if isinstance(query, str):
             query = query.encode(charset)
         self._query(query)
         if not self._defer_warnings:
-            self._warning_check()
+            self.warning_check()
         return args
 
     def __iter__(self):
@@ -319,158 +301,280 @@ class Cursor(object):
 
     def _query(self, query):
         """Low-level; executes query, gets result, sets up decoders."""
-        connection = self._get_db()
-        self._flush()
+        connection = self.connection
+        self._push()
         self._executed = query
         connection.query(query)
-        self._result = Result(self)
+        self._acquire_result()
 
     def fetchone(self):
-        """Fetches a single row from the cursor. None indicates that
-        no more rows are available."""
+        """
+        Fetches a single row from the cursor. None indicates that
+        no more rows are available.
+        :return formatted row or None if there is no more rows
+        """
         self._check_executed()
-        if not self._result:
+        if self._result is None:
             return None
-        return self._result.fetchone()
+        return self.row_formatter(self._row_decoders, self._result.fetch_row())
 
     def fetchmany(self, size=None):
         """Fetch up to size rows from the cursor. Result set may be smaller
         than size. If size is not defined, cursor.arraysize is used."""
         self._check_executed()
-        if not self._result:
+        if self._result is None:
             return []
         if size is None:
             size = self.arraysize
-        return self._result.fetchmany(size)
+
+        rows = []
+        append = rows.append
+        for _ in range(size):
+            row = self.fetchone()
+            if row is None:
+                break
+            append(row)
+        return rows
 
     def fetchall(self):
         """Fetches all available rows from the cursor."""
         self._check_executed()
-        if not self._result:
+        if self._result is None:
             return []
-        return self._result.fetchall()
+        return [row for row in self]
 
-    def scroll(self, value, mode='relative'):
-        """Scroll the cursor in the result set to a new position according
-        to mode.
-
+    def scroll(self, offset, mode='relative'):
+        """
+        Scroll the cursor in the result set to a new position according to mode.
         If mode is 'relative' (default), value is taken as offset to
         the current position in the result set, if set to 'absolute',
-        value states an absolute target position."""
+        value states an absolute target position.
+        """
+        origin = 0
         self._check_executed()
         if mode == 'relative':
-            row = self.rownumber + value
+            origin = 1  # SEEK_CUR
         elif mode == 'absolute':
-            row = value
+            origin = 0  # SEEK_SET
         else:
-            self.errorhandler(self, self.ProgrammingError,
-                              "unknown scroll mode %s" % `mode`)
-        if row < 0 or row >= len(self._rows):
-            self.errorhandler(self, IndexError, "out of range")
-        self.rownumber = row
+            self.errorhandler(self.ProgrammingError("unknown scroll mode %s" % (mode,)))
+
+        self._result.row_seek(offset, origin)
 
 
-class Result(object):
+class CursorAsync(CursorBase):
+    class _NullResult:
+        @staticmethod
+        def fetch_row_async():
+            return constants.NET_ASYNC_COMPLETE, None
 
-    def __init__(self, cursor):
-        self.cursor = cursor
-        db = cursor._get_db()
-        result = db.get_result(cursor.use_result)
-        self.result = result
-        decoders = cursor.decoders
-        self.row_formatter = cursor.row_formatter
-        self.max_buffer = 1000
-        self.rows = []
-        self.row_start = 0
-        self.rows_read = 0
-        self.row_index = 0
-        self.lastrowid = db.insert_id()
-        self.warning_count = db.warning_count()
-        self.info = db.info()
-        self.rowcount = -1
-        self.description = None
-        self.field_flags = ()
-        self.row_decoders = ()
+        free_async = fetch_row_async
 
-        if result:
-            self.description = result.describe()
-            self.field_flags = result.field_flags()
-            self.row_decoders = tuple(( get_codec(field, decoders) for field in result.fields ))
-            if not cursor.use_result:
-                self.rowcount = db.affected_rows()
-                self.flush()
+    use_result = True
 
-    def flush(self):
-        if self.result:
-            self.rows.extend([ self.row_formatter(self.row_decoders, row) for row in self.result ])
-            self.result.clear()
-            self.result = None
+    @asyncio.coroutine
+    def _release_result(self):
+        result = super()._release_result()
+        if result is not None:
+            result = self._result
+            connection = self.connection
+            self._result = None
+            try:
+                while (yield from connection.promise(result.fetch_row_async)) is not None:
+                    pass
 
-    def clear(self):
-        if self.result:
-            self.result.clear()
-            self.result = None
+                yield from connection.promise(result.free_async)
+            except self.StandardError:
+                pass
 
-    def fetchone(self):
-        if self.result:
-            while self.row_index >= len(self.rows):
-                row = self.result.fetch_row()
-                if row is None:
-                    return row
-                self.rows.append(self.row_formatter(self.row_decoders, row))
-        if self.row_index >= len(self.rows):
-            return None
-        row = self.rows[self.row_index]
-        self.row_index += 1
-        return row
+    @asyncio.coroutine
+    def close(self):
+        while (yield from self.nextset()):
+            pass
+        self._result = None
 
-    def __iter__(self): return self
-
-    def next(self):
-        row = self.fetchone()
-        if row is None:
-            raise StopIteration
-        return row
-
-    def fetchmany(self, size):
-        """Fetch up to size rows from the cursor. Result set may be smaller
-        than size. If size is not defined, cursor.arraysize is used."""
-        row_end = self.row_index + size
-        if self.result:
-            while self.row_index >= len(self.rows):
-                row = self.result.fetch_row()
-                if row is None:
-                    break
-                self.rows.append(self.row_formatter(self.row_decoders, row))
-        if self.row_index >= len(self.rows):
-            return []
-        if row_end >= len(self.rows):
-            row_end = len(self.rows)
-        rows = self.rows[self.row_index:row_end]
-        self.row_index = row_end
-        return rows
-
-    def fetchall(self):
-        if self.result:
-            self.flush()
-        rows = self.rows[self.row_index:]
-        self.row_index = len(self.rows)
-        return rows
-
+    @asyncio.coroutine
     def warning_check(self):
         """Check for warnings, and report via the warnings module."""
-        if self.warning_count:
-            cursor = self.cursor
-            warnings = cursor._get_db()._show_warnings()
+        connection = self.connection
+        if connection.warning_count:
+            warnings = yield from connection.show_warnings()
             if warnings:
-                # This is done in two loops in case
-                # Warnings are set to raise exceptions.
-                for warning in warnings:
-                    cursor.warnings.append((self.Warning, warning))
-                for warning in warnings:
-                    warn(warning[-1], self.Warning, 3)
+                #TODO mysql warning is a tuple, but mysql does not handle it
+                for warning in map(connection.Warning, warnings):
+                    self.messages.append(warning)
+                    warn(warning, stacklevel=3)
             elif self._info:
-                cursor.messages.append((self.Warning, self._info))
-                warn(self._info, self.Warning, 3)
+                warning = connection.Warning(self._info)
+                self.messages.append(warning)
+                warn(warning, stacklevel=3)
 
+    @asyncio.coroutine
+    def nextset(self):
+        """
+        Advance to the next result set.
+        Returns False if there are no more result sets.
+        """
+        yield from self._release_result()
+        if self._pop():
+            return True
 
+        connection = self.connection
+        if (yield from connection.next_result()):
+            self._acquire_result()
+            return True
+        return False
+
+    @asyncio.coroutine
+    def execute(self, query, args=None):
+        """
+        Execute a query.
+        :param query: string, query to execute on server
+        :param args: optional sequence or mapping, parameters to use with query.
+                     Note: If args is a sequence, then %s must be used as the
+                     parameter placeholder in the query. If a mapping is used,
+                     %(key)s must be used as the placeholder.
+        """
+        self._push()
+        connection = self.connection
+        charset = connection.charset
+        if isinstance(query, str):
+            query = query.encode(charset)
+        try:
+            if args is not None:
+                query = query % tuple((get_codec(connection, a, self.encoders)(connection, a) for a in args))
+            yield from self._query(query)
+        except TypeError as e:
+            self.errorhandler(self.ProgrammingError(str(e)))
+        except Exception as e:
+            self.errorhandler(e)
+
+        if not self._defer_warnings:
+            yield from self.warning_check()
+
+    @asyncio.coroutine
+    def executemany(self, query, args):
+        """
+        Execute a multi-row query.
+        This method improves performance on multiple-row INSERT and
+        REPLACE. Otherwise it is equivalent to looping over args with
+        execute().
+
+        :param query: string, query to execute on server
+        :param args: Sequence of sequences or mappings, parameters to use with query.
+        """
+        connection = self.connection
+        if not args:
+            return
+
+        charset = connection.charset
+        if isinstance(query, str):
+            query = query.encode(charset)
+        matched = INSERT_VALUES.match(query)
+        if not matched:
+            for row in args:
+                yield from self.execute(query, row)
+            return
+
+        start = matched.group('start')
+        values = matched.group('values')
+        end = matched.group('end')
+
+        try:
+            sql_params = tuple(values % tuple(get_codec(connection, a, self.encoders)(connection, a) for a in row) for row in args)
+            multi_row_query = '\n'.join([start, ',\n'.join(sql_params), end])
+            yield from self._query(multi_row_query)
+        except TypeError as e:
+            self.errorhandler(self.ProgrammingError(e))
+        except Exception as e:
+            self.errorhandler(e)
+
+        if not self._defer_warnings:
+            yield from self.warning_check()
+
+    def callproc(self, procname, args=()):
+        """
+        Execute stored procedure procname with args
+
+        :param procname: string, name of procedure to execute on server
+        :param args: Sequence of parameters to use with procedure
+
+        :return the original args. (update args for inout parameters additional performance penalty, skip it)
+        """
+
+        connection = self.connection
+        charset = connection.charset
+        for index, arg in enumerate(args):
+            query = "SET @_%s_%d=%s" % (procname, index, self._encode(connection, arg))
+            if isinstance(query, str):
+                query = query.encode(charset)
+            yield from self._query(query)
+            yield from self.nextset()
+
+        query = "CALL %s(%s)" % (procname, ','.join(['@_%s_%d' % (procname, i) for i in range(len(args))]))
+        if isinstance(query, str):
+            query = query.encode(charset)
+        yield from self._query(query)
+        if not self._defer_warnings:
+            yield from self.warning_check()
+        return args
+
+    @asyncio.coroutine
+    def _query(self, query):
+        """Low-level; executes query, gets result, sets up decoders."""
+        connection = self.connection
+        self._push()
+        self._executed = query
+        yield from connection.query(query)
+        self._acquire_result()
+
+    @asyncio.coroutine
+    def fetchone(self):
+        """
+        Fetches a single row from the cursor. None indicates that
+        no more rows are available.
+        :return formatted row or None if there is no more rows
+        """
+        self._check_executed()
+        if self._result is None:
+            return None
+        connection = self.connection
+        row = yield from connection.promise(self._result.fetch_row_async)
+        if row is None:
+            return row
+        return self.row_formatter(self._row_decoders, row)
+
+    @asyncio.coroutine
+    def fetchmany(self, size=None):
+        """Fetch up to size rows from the cursor. Result set may be smaller
+        than size. If size is not defined, cursor.arraysize is used."""
+        self._check_executed()
+        if self._result is None:
+            return []
+        if size is None:
+            size = self.arraysize
+
+        rows = []
+        append = rows.append
+        for _ in range(size):
+            row = yield from self.fetchone()
+            if row is None:
+                break
+            append(row)
+        return rows
+
+    @asyncio.coroutine
+    def fetchall(self):
+        """Fetches all available rows from the cursor."""
+        rows = []
+        self._check_executed()
+        if self._result is None:
+            return rows
+
+        append = rows.append
+        while True:
+            row = yield from self.fetchone()
+            if row is None:
+                break
+            append(row)
+        return rows

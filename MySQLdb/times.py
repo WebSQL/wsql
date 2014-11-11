@@ -12,6 +12,10 @@ Uses Python datetime module to handle time-releated columns."""
 
 from time import localtime
 from datetime import date, datetime, time, timedelta
+from math import modf
+
+__all__ = ["Date", "Time", "TimeDelta", "Timestamp",
+           "DateFromTicks", "TimeFromTicks", "TimestampFromTicks"]
 
 # These are required for DB-API (PEP-249)
 Date = date
@@ -19,47 +23,59 @@ Time = time
 TimeDelta = timedelta
 Timestamp = datetime
 
-def DateFromTicks(ticks):
-    """Convert UNIX ticks into a date instance.
-    
-      >>> DateFromTicks(1172466380)
-      datetime.date(2007, 2, 26)
-      >>> DateFromTicks(0)
-      datetime.date(1969, 12, 31)
-      >>> DateFromTicks(2**31-1)
-      datetime.date(2038, 1, 18)
 
-    This is a standard DB-API constructor.
+def date_from_ticks(ticks):
+    """
+        Convert UNIX ticks into a date instance.
+        >>> date_from_ticks(1172466380)
+        datetime.date(2007, 2, 26)
+        >>> date_from_ticks(0)
+        datetime.date(1970, 1, 1)
+        >>> date_from_ticks(2 ** 31 - 1)
+        datetime.date(2038, 1, 19)
+
+        This is a standard DB-API constructor.
     """
     return date(*localtime(ticks)[:3])
 
-def TimeFromTicks(ticks):
-    """Convert UNIX ticks into a time instance.
+DateFromTicks = date_from_ticks
+
+
+def time_from_ticks(ticks):
+    """
+        Convert UNIX ticks into a time instance.
     
-      >>> TimeFromTicks(1172466380)
-      datetime.time(0, 6, 20)
-      >>> TimeFromTicks(0)
-      datetime.time(18, 0)
-      >>> TimeFromTicks(2**31-1)
-      datetime.time(21, 14, 7)
+        >>> time_from_ticks(1172466380)
+        datetime.time(8, 6, 20)
+        >>> time_from_ticks(0)
+        datetime.time(3, 0)
+        >>> time_from_ticks(2 ** 31 - 1)
+        datetime.time(6, 14, 7)
     
-    This is a standard DB-API constructor.
+        This is a standard DB-API constructor.
     """
     return time(*localtime(ticks)[3:6])
 
-def TimestampFromTicks(ticks):
-    """Convert UNIX ticks into a datetime instance.
+TimeFromTicks = time_from_ticks
+
+
+def timestamp_from_ticks(ticks):
+    """
+        Convert UNIX ticks into a datetime instance.
     
-      >>> TimestampFromTicks(1172466380)
-      datetime.datetime(2007, 2, 25, 23, 6, 20)
-      >>> TimestampFromTicks(0)
-      datetime.datetime(1969, 12, 31, 18, 0)
-      >>> TimestampFromTicks(2**31-1)
-      datetime.datetime(2038, 1, 18, 21, 14, 7)
+        >>> timestamp_from_ticks(1172466380)
+        datetime.datetime(2007, 2, 26, 8, 6, 20)
+        >>> timestamp_from_ticks(0)
+        datetime.datetime(1970, 1, 1, 3, 0)
+        >>> timestamp_from_ticks(2 ** 31 - 1)
+        datetime.datetime(2038, 1, 19, 6, 14, 7)
     
-    This is a standard DB-API constructor.
+        This is a standard DB-API constructor.
     """
     return datetime(*localtime(ticks)[:6])
+
+TimestampFromTicks = timestamp_from_ticks
+
 
 def timedelta_to_str(obj):
     """Format a timedelta as a string.
@@ -75,6 +91,7 @@ def timedelta_to_str(obj):
     hours = int(obj.seconds / 3600) % 24
     return '%d %02d:%02d:%02d' % (obj.days, hours, minutes, seconds)
 
+
 def datetime_to_str(obj):
     """Convert a datetime to an ISO-format string.
     
@@ -84,21 +101,22 @@ def datetime_to_str(obj):
     """
     return obj.strftime("%Y-%m-%d %H:%M:%S")
 
+
 def datetime_or_orig(obj):
-    """Returns a DATETIME or TIMESTAMP column value as a datetime object:
+    """
+        Returns a DATETIME or TIMESTAMP column value as a datetime object:
     
-      >>> datetime_or_orig('2007-02-25 23:06:20')
-      datetime.datetime(2007, 2, 25, 23, 6, 20)
-      >>> datetime_or_orig('2007-02-25T23:06:20')
-      datetime.datetime(2007, 2, 25, 23, 6, 20)
+        >>> datetime_or_orig('2007-02-25 23:06:20')
+        datetime.datetime(2007, 2, 25, 23, 6, 20)
+        >>> datetime_or_orig('2007-02-25T23:06:20')
+        datetime.datetime(2007, 2, 25, 23, 6, 20)
     
-    Illegal values are returned unchanged:
+        Illegal values are returned unchanged:
     
-      >>> datetime_or_orig('2007-02-31T23:06:20')
-      '2007-02-31T23:06:20'
-      >>> datetime_or_orig('0000-00-00 00:00:00')
-      '0000-00-00 00:00:00'
-   
+        >>> datetime_or_orig('2007-02-31T23:06:20')
+        '2007-02-31T23:06:20'
+        >>> datetime_or_orig('0000-00-00 00:00:00')
+        '0000-00-00 00:00:00'
     """
     if ' ' in obj:
         sep = ' '
@@ -109,125 +127,130 @@ def datetime_or_orig(obj):
 
     try:
         ymd, hms = obj.split(sep, 1)
-        return datetime(*[ int(x) for x in ymd.split('-')+hms.split(':') ])
+        return datetime(*[int(x) for x in ymd.split('-')+hms.split(':')])
     except ValueError:
         return obj
+
 
 def timedelta_or_orig(obj):
-    """Returns a TIME column as a timedelta object:
-
-      >>> timedelta_or_orig('25:06:17')
-      datetime.timedelta(1, 3977)
-      >>> timedelta_or_orig('-25:06:17')
-      datetime.timedelta(-2, 83177)
-      
-    Illegal values are returned unchanged:
-    
-      >>> timedelta_or_orig('random crap')
-      'random crap'
-   
-    Note that MySQL always returns TIME columns as (+|-)HH:MM:SS, but
-    can accept values as (+|-)DD HH:MM:SS. The latter format will not
-    be parsed correctly by this function.
     """
-    from math import modf
+        Returns a TIME column as a timedelta object:
+
+        >>> timedelta_or_orig('25:06:17')
+        datetime.timedelta(1, 3977)
+        >>> timedelta_or_orig('-25:06:17')
+        datetime.timedelta(-2, 83177)
+      
+        Illegal values are returned unchanged:
+    
+        >>> timedelta_or_orig('random crap')
+        'random crap'
+   
+        Note that MySQL always returns TIME columns as (+|-)HH:MM:SS, but
+        can accept values as (+|-)DD HH:MM:SS. The latter format will not
+        be parsed correctly by this function.
+    """
     try:
         hours, minutes, seconds = obj.split(':')
-        tdelta = timedelta(
-            hours = int(hours),
-            minutes = int(minutes),
-            seconds = int(seconds),
-            microseconds = int(modf(float(seconds))[0]*1000000),
-            )
-        if hours < 0:
-            return -tdelta
+        delta = timedelta(
+            hours=int(hours),
+            minutes=int(minutes),
+            seconds=int(seconds),
+            microseconds=int(modf(float(seconds))[0] * 1000000))
+        if delta.seconds < 0:
+            return -delta
         else:
-            return tdelta
+            return delta
     except ValueError:
         return obj
 
-def time_or_orig(obj):
-    """Returns a TIME column as a time object:
 
-      >>> time_or_orig('15:06:17')
-      datetime.time(15, 6, 17)
-      
-    Illegal values are returned unchanged:
- 
-      >>> time_or_orig('-25:06:17')
-      '-25:06:17'
-      >>> time_or_orig('random crap')
-      'random crap'
-   
-    Note that MySQL always returns TIME columns as (+|-)HH:MM:SS, but
-    can accept values as (+|-)DD HH:MM:SS. The latter format will not
-    be parsed correctly by this function.
-    
-    Also note that MySQL's TIME column corresponds more closely to
-    Python's timedelta and not time. However if you want TIME columns
-    to be treated as time-of-day and not a time offset, then you can
-    use set this function as the converter for FIELD_TYPE.TIME.
+def time_or_orig(obj):
     """
-    from math import modf
+        Returns a TIME column as a time object:
+
+        >>> time_or_orig('15:06:17')
+        datetime.time(15, 6, 17)
+      
+        Illegal values are returned unchanged:
+ 
+        >>> time_or_orig('-25:06:17')
+        '-25:06:17'
+        >>> time_or_orig('random crap')
+        'random crap'
+   
+        Note that MySQL always returns TIME columns as (+|-)HH:MM:SS, but
+        can accept values as (+|-)DD HH:MM:SS. The latter format will not
+        be parsed correctly by this function.
+    
+        Also note that MySQL's TIME column corresponds more closely to
+        Python's timedelta and not time. However if you want TIME columns
+        to be treated as time-of-day and not a time offset, then you can
+        use set this function as the converter for FIELD_TYPE.TIME.
+    """
     try:
         hour, minute, second = obj.split(':')
         return time(hour=int(hour), minute=int(minute), second=int(second),
-                    microsecond=int(modf(float(second))[0]*1000000))
+                    microsecond=int(modf(float(second))[0] * 1000000))
     except ValueError:
         return obj
 
-def date_or_orig(obj):
-    """Returns a DATE column as a date object:
 
-      >>> date_or_orig('2007-02-26')
-      datetime.date(2007, 2, 26)
+def date_or_orig(obj):
+    """
+        Returns a DATE column as a date object:
+
+        >>> date_or_orig('2007-02-26')
+        datetime.date(2007, 2, 26)
       
-    Illegal values are returned unchanged:
+        Illegal values are returned unchanged:
  
-      >>> date_or_orig('2007-02-31')
-      '2007-02-31'
-      >>> date_or_orig('0000-00-00')
-      '0000-00-00'
-    
+        >>> date_or_orig('2007-02-31')
+        '2007-02-31'
+        >>> date_or_orig('0000-00-00')
+        '0000-00-00'
     """
     try:
         return date(*map(int, obj.split('-', 2)))
     except ValueError:
         return obj
 
+
 def datetime_to_sql(connection, obj):
     """Format a DateTime object as an ISO timestamp."""
     return connection.string_literal(datetime_to_str(obj))
-    
+
+
 def timedelta_to_sql(connection, obj):
     """Format a timedelta as an SQL literal."""
     return connection.string_literal(timedelta_to_str(obj))
 
-def timestamp_or_orig(timestamp):
-    """Convert a MySQL TIMESTAMP to a Timestamp object.
 
-    MySQL >= 4.1 returns TIMESTAMP in the same format as DATETIME:
+def timestamp_or_orig(timestamp):
+    """
+        Convert a MySQL TIMESTAMP to a Timestamp object.
+
+        MySQL >= 4.1 returns TIMESTAMP in the same format as DATETIME:
     
-      >>> timestamp_or_orig('2007-02-25 22:32:17')
-      datetime.datetime(2007, 2, 25, 22, 32, 17)
+        >>> timestamp_or_orig('2007-02-25 22:32:17')
+        datetime.datetime(2007, 2, 25, 22, 32, 17)
     
-    MySQL < 4.1 uses a big string of numbers:
+        MySQL < 4.1 uses a big string of numbers:
     
-      >>> timestamp_or_orig('20070225223217')
-      datetime.datetime(2007, 2, 25, 22, 32, 17)
+        >>> timestamp_or_orig('20070225223217')
+        datetime.datetime(2007, 2, 25, 22, 32, 17)
     
-    Illegal values are returned unchanged:
+        Illegal values are returned unchanged:
     
-      >>> timestamp_or_orig('2007-02-31 22:32:17')
-      '2007-02-31 22:32:17'
-      >>> timestamp_or_orig('00000000000000')
-      '00000000000000'
-      
+        >>> timestamp_or_orig('2007-02-31 22:32:17')
+        '2007-02-31 22:32:17'
+        >>> timestamp_or_orig('00000000000000')
+        '00000000000000'
     """
     try:
         if timestamp[4] == '-':
             return datetime_or_orig(timestamp)
-        timestamp += "0"*(14-len(timestamp)) # padding
+        timestamp += "0" * (14 - len(timestamp))  # padding
         year, month, day, hour, minute, second = \
             int(timestamp[:4]), int(timestamp[4:6]), int(timestamp[6:8]), \
             int(timestamp[8:10]), int(timestamp[10:12]), int(timestamp[12:14])
@@ -237,6 +260,7 @@ def timestamp_or_orig(timestamp):
         return datetime(year, month, day, hour, minute, second)
     except ValueError:
         return timestamp
+
 
 if __name__ == "__main__":
     import doctest
