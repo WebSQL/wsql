@@ -17,15 +17,15 @@ _mysql_connection_object__init__(
          *capath = NULL, *cipher = NULL;
 #endif
     char *host = NULL, *user = NULL, *password = NULL,
-         *db = NULL, *socket_name = NULL,
+         *database = NULL, *socket_name = NULL,
          *init_command=NULL, *read_default_file=NULL, *read_default_group=NULL;
     unsigned int port = 0, client_flag = 0, connect_timeout = 0;
     int nonblocking = 0, compress = -1, local_infile = -1;
 
     static char *kwlist[] = {
-        "host", "user", "password", "database", "port", "socket_name",
-        "connect_timeout", "compress", "init_command",
-        "read_default_file", "read_default_group", "client_flag",
+        "host", "user", "password", "database",
+        "port", "socket_name", "connect_timeout", "compress",
+        "init_command", "read_default_file", "read_default_group", "client_flag",
         "ssl", "local_infile", "nonblocking",
         NULL
     };
@@ -36,15 +36,10 @@ _mysql_connection_object__init__(
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|ssssIsIisssIOii:connect",
                      kwlist,
-                     &host, &user, &password, &db,
-                     &port, &socket_name,
-                     &connect_timeout,
-                     &compress,
-                     &init_command, &read_default_file,
-                     &read_default_group,
-                     &client_flag, &ssl,
-                     &local_infile,
-                     &nonblocking))
+                     &host, &user, &password, &database,
+                     &port, &socket_name, &connect_timeout, &compress,
+                     &init_command, &read_default_file, &read_default_group,
+                     &client_flag, &ssl, &local_infile, &nonblocking))
         return -1;
 
     if (nonblocking) {
@@ -74,19 +69,15 @@ _mysql_connection_object__init__(
 #endif
     }
 #undef GET_ITEM_STRING
-
     Py_BEGIN_ALLOW_THREADS ;
     conn = mysql_init(&(self->connection));
+
     if (compress != -1) {
         mysql_options(&(self->connection), MYSQL_OPT_COMPRESS, 0);
         client_flag |= CLIENT_COMPRESS;
     }
     if (connect_timeout)
         mysql_options(&(self->connection), MYSQL_OPT_CONNECT_TIMEOUT, (char *)&connect_timeout);
-#ifdef _WIN32
-    if (socket_name != NULL)
-        mysql_options(&(self->connection), MYSQL_OPT_NAMED_PIPE, 0);
-#endif
     if (init_command != NULL)
         mysql_options(&(self->connection), MYSQL_INIT_COMMAND, init_command);
     if (read_default_file != NULL)
@@ -96,6 +87,12 @@ _mysql_connection_object__init__(
     if (local_infile != -1)
         mysql_options(&(self->connection), MYSQL_OPT_LOCAL_INFILE, (char *) &local_infile);
 
+#ifdef _WIN32
+    if (socket_name != NULL)
+        mysql_options(&(self->connection), MYSQL_OPT_NAMED_PIPE, 0);
+#endif
+
+
 #if HAVE_OPENSSL
     if (ssl)
         mysql_ssl_set(&(self->connection), key, cert, ca, capath, cipher);
@@ -104,27 +101,22 @@ _mysql_connection_object__init__(
     if (nonblocking) {
 #ifdef HAVE_ASYNCIO
         if (!mysql_real_connect_nonblocking_init(&(self->connection),
-                host, user, password, db, port, socket_name, client_flag))
+                host, user, password, database, port, socket_name, client_flag))
             conn = NULL;
 #endif
     } else {
-        conn = mysql_real_connect(&(self->connection), host, user, password, db, port, socket_name, client_flag);
+        conn = mysql_real_connect(&(self->connection),
+            host, user, password, database, port, socket_name, client_flag);
     }
 
     self->autocommit = self->connection.server_capabilities & CLIENT_TRANSACTIONS ? 1 : 0;
     Py_END_ALLOW_THREADS ;
 
-    if (!conn) {
+    if (conn == NULL) {
         _mysql_exception(self);
         return -1;
     }
 
-    /*
-      PyType_GenericAlloc() automatically sets up GC allocation and
-      tracking for GC objects, at least in 2.2.1, so it does not need to
-      be done here. tp_dealloc still needs to call PyObject_GC_UnTrack(),
-      however.
-    */
     self->open = 1;
     return 0;
 }

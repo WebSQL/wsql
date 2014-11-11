@@ -81,7 +81,6 @@ _mysql_result_object__init__(
 
     n = mysql_num_fields(result);
     self->num_fields = n;
-    self->row_index = 0;
     self->fields = _mysql_result_object_get_fields(self, n);
     return 0;
 }
@@ -184,7 +183,6 @@ _mysql_result_object_fetch_row(
         row = mysql_fetch_row(self->result);
         Py_END_ALLOW_THREADS;
     }
-    self->row_index++;
     return _mysql_convert_row(self, row);
 }
 
@@ -284,21 +282,40 @@ static char _mysql_result_object_row_seek__doc__[] =
 static PyObject *
 _mysql_result_object_row_seek(
      _mysql_result_object *self,
-     PyObject *args)
+     PyObject *args,
+     PyObject *kwargs)
 {
-    int offset;
+    static char *kwlist[] = {"origin", NULL};
+    int origin=SEEK_CUR;
+    Py_ssize_t offset;
+
     MYSQL_ROW_OFFSET r;
 
-    if (!PyArg_ParseTuple(args, "i:row_seek", &offset))
-        return NULL;
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "n|i:", kwlist, &offset, &origin))
 
     CHECK_RESULT(self, NULL);
     if (self->use) {
-        PyErr_SetString(_mysql_programming_error, "cannot be used with connection.use_result()");
+        PyErr_SetString(_mysql_programming_error, "cannot be used with connection.get_result(use=True)");
         return NULL;
     }
+
     r = mysql_row_tell(self->result);
-    mysql_row_seek(self->result, r + offset);
+
+    switch (origin)
+    {
+    case SEEK_CUR:
+        r += (size_t)offset;
+        break;
+    case SEEK_SET:
+        r -= self->result->data->data;
+        r += (size_t)offset;
+        break;
+    default:
+        PyErr_SetString(_mysql_programming_error, "cannot be used with connection.get_result(use=True)");
+        return NULL;
+    };
+
+    mysql_row_seek(self->result, r);
     Py_RETURN_NONE;
 }
 
@@ -317,7 +334,7 @@ _mysql_result_object_row_tell(
         return NULL;
     }
     r = mysql_row_tell(self->result);
-    return PyLong_FromLong(r-self->result->data->data);
+    return PyLong_FromLong(r - self->result->data->data);
 }
 
 
@@ -347,7 +364,6 @@ _mysql_result_object_fetch_row_async(
         Py_INCREF(row);
     }
     else {
-        self->row_index++;
         row = _mysql_convert_row(self, mysql_row);
     }
 
@@ -414,7 +430,7 @@ static PyMethodDef _mysql_result_object_methods[] = {
     {
         "row_seek",
         (PyCFunction)_mysql_result_object_row_seek,
-        METH_VARARGS,
+        METH_VARARGS | METH_KEYWORDS,
         _mysql_result_object_row_seek__doc__
     },
     {
@@ -487,13 +503,6 @@ static struct PyMemberDef _mysql_result_object_members[] = {
         offsetof(_mysql_result_object, use),
         READONLY,
         "True if mysql_use_result() was used; False if mysql_store_result() was used"
-    },
-    {
-        "row_index",
-        T_LONGLONG,
-        offsetof(_mysql_result_object, row_index),
-        READONLY,
-        "The current row_index"
     },
     {NULL} /* Sentinel */
 };
