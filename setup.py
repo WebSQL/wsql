@@ -9,17 +9,19 @@ if not hasattr(sys, "hexversion") or sys.hexversion < 0x02040000:
 
 if os.name == "posix":
     from setup_posix import get_config
-else: # assume windows
+else:  # assume windows
     from setup_windows import get_config
 
 metadata, options = get_config()
 metadata['ext_modules'] = [
     Extension(sources=['src/mysqlmod.c',
                        'src/connections.c',
-                       'src/results.c',
+                       'src/constants.c',
+                       'src/exceptions.c',
                        'src/fields.c',
+                       'src/results.c'
                        ],
               **options),
-    ]
+]
 metadata['long_description'] = metadata['long_description'].replace(r'\n', '')
 setup(**metadata)
