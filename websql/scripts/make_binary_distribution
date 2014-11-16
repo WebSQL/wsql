@@ -1,0 +1,1 @@
+cd /Users/bgaifullin/Sources/git/moist/wsql && '/usr/local/Cellar/cmake/3.0.0/bin/cpack' -G TGZ --config CPackConfig.cmake
