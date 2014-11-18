@@ -2743,8 +2743,6 @@ typedef struct {
 
 
 /* A state machine for authentication itself. */
-//struct st_asm_context;
-//typedef struct st_asm_context asm_context;
 
 typedef state_machine_status (*asm_function)(asm_context*);
 
