@@ -18,23 +18,23 @@ _mysql_result_object_get_fields(
         return NULL;
 
     if (!(kwargs2 = PyDict_New()))
-        goto error;
+        goto on_error;
 
     for (i=0; i<num_fields; ++i) {
         if (!(args2 = Py_BuildValue("(Oi)", self, i)))
-            goto error;
+            goto on_error;
         if (!(field = Py_ALLOC(_mysql_field_object, _mysql_field_object_t)))
-            goto error;
+            goto on_error;
 
         if (_mysql_field_object__init__(field, args2, kwargs2))
-            goto error;
+            goto on_error;
         Py_DECREF(args2);
         PyTuple_SET_ITEM(fields, i, (PyObject *) field);
     }
     Py_DECREF(kwargs2);
     return fields;
 
-  error:
+  on_error:
     Py_XDECREF(args2);
     Py_XDECREF(kwargs2);
     Py_XDECREF(fields);
@@ -115,11 +115,12 @@ _mysql_result_object_describe(
                                    (long) fields[i].decimals,
                                    (long) !(IS_NOT_NULL(fields[i].flags)));
         if (!field_desc)
-            goto error;
+            goto on_error;
         PyTuple_SET_ITEM(result, i, field_desc);
     }
     return result;
-  error:
+
+  on_error:
     Py_XDECREF(result);
     return NULL;
 }
@@ -150,7 +151,7 @@ _mysql_convert_row(
         if (row[i]) {
             v = PyString_FromStringAndSize(row[i], length[i]);
             if (!v)
-                goto error;
+                goto on_error;
         } else /* NULL */ {
             v = Py_None;
             Py_INCREF(v);
@@ -158,7 +159,8 @@ _mysql_convert_row(
         PyTuple_SET_ITEM(result, i, v);
     }
     return result;
-  error:
+
+  on_error:
     Py_DECREF(result);
     return NULL;
 }
@@ -307,8 +309,7 @@ _mysql_result_object_row_seek(
         r += (size_t)offset;
         break;
     case SEEK_SET:
-        r -= self->result->data->data;
-        r += (size_t)offset;
+        r = self->result->data->data + (size_t)offset;
         break;
     default:
         PyErr_SetString(_mysql_programming_error, "cannot be used with connection.get_result(use=True)");
@@ -368,12 +369,13 @@ _mysql_result_object_fetch_row_async(
     }
 
     if (!(result = PyTuple_New(2)))
-        goto error;
+        goto on_error;
 
     PyTuple_SET_ITEM(result, 0, PyLong_FromLong((long)status));
     PyTuple_SET_ITEM(result, 1, row);
     return result;
-  error:
+
+  on_error:
     Py_XDECREF(row);
     return NULL;
 }
@@ -521,7 +523,7 @@ static struct PyGetSetDef _mysql_result_object_getset[]  = {
 
 PyTypeObject _mysql_result_object_t = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "_mysql.Result",                                               /* tp_name */
+    STRINGIFY(MODULE_NAME) ".Result",                                               /* tp_name */
     sizeof(_mysql_result_object),                                   /* tp_basicsize */
     0,                                                             /* tp_itemsize */
     (destructor)_mysql_result_object_dealloc,                       /* tp_dealloc */

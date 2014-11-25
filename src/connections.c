@@ -213,7 +213,6 @@ _mysql_connection_object_escape_string(
 
     output_size = mysql_real_escape_string(&(self->connection), PyBytes_AS_STRING(output), input_string, input_size);
     if (output_size != input_size << 1 && _PyBytes_Resize(&output, output_size) < 0) {
-        Py_DECREF(output);
         return NULL;
     }
     return output;
@@ -245,8 +244,7 @@ _mysql_connection_object_string_literal(
     output_string = PyBytes_AS_STRING(output);
     output_size = mysql_real_escape_string(&(self->connection), output_string + 1, input_string, input_size);
     output_string[0] = output_string[output_size + 1] = '\'';
-    if (output_size != input_size << 1 && _PyBytes_Resize(&output, output_size) < 0) {
-        Py_DECREF(output);
+    if (output_size != input_size << 1 && _PyBytes_Resize(&output, output_size + 2) < 0) {
         return NULL;
     }
     return output;
@@ -602,7 +600,7 @@ _mysql_connection_object_set_charset(
     PyObject *arg,
     void* closure)
 {
-    int error;
+    int error = 0;
     const char* charset = PyString_AsString(arg);
     if (!charset)
         return -1;
@@ -616,7 +614,7 @@ _mysql_connection_object_set_charset(
 #else
         char query[256];
         snprintf(query, 256, "SET NAMES %s", charset);
-        error = mysql_query(&(self->connection), "COMMIT");
+        error = mysql_query(&(self->connection), query);
 #endif
     }
     Py_END_ALLOW_THREADS
@@ -965,16 +963,16 @@ _mysql_connection_object_get_result(
     CHECK_CONNECTION(self, NULL);
 
     if (!(args2 = Py_BuildValue("(Oi)", self, use)))
-        goto error;
+        goto on_error;
 
     if (!(kwargs2 = PyDict_New()))
-        goto error;
+        goto on_error;
 
     if (!(result = Py_ALLOC(_mysql_result_object, _mysql_result_object_t)))
-        goto error;
+        goto on_error;
 
     if (_mysql_result_object__init__(result, args2, kwargs2) < 0)
-        goto error;
+        goto on_error;
 
     Py_DECREF(args2);
     Py_DECREF(kwargs2);
@@ -984,7 +982,8 @@ _mysql_connection_object_get_result(
         Py_RETURN_NONE;
     }
     return (PyObject*)result;
-  error:
+
+  on_error:
     Py_XDECREF(args2);
     Py_XDECREF(kwargs2);
     Py_XDECREF(result);
@@ -1232,10 +1231,16 @@ static PyMethodDef _mysql_connection_object_methods[] = {
         _mysql_connection_object_dump_debug_info__doc__
     },
     {
-        "escape_string",
+        "escape",
         (PyCFunction)_mysql_connection_object_escape_string,
         METH_VARARGS,
         _mysql_connection_object_escape_string__doc__
+    },
+    {
+        "literal",
+        (PyCFunction)_mysql_connection_object_string_literal,
+        METH_VARARGS,
+        _mysql_connection_object_string_literal__doc__
     },
     {
         "get_result",
@@ -1272,12 +1277,6 @@ static PyMethodDef _mysql_connection_object_methods[] = {
         (PyCFunction)_mysql_connection_object_shutdown,
         METH_NOARGS,
         _mysql_connection_object_shutdown__doc__
-    },
-    {
-        "string_literal",
-        (PyCFunction)_mysql_connection_object_string_literal,
-        METH_VARARGS,
-        _mysql_connection_object_string_literal__doc__
     },
     {
         "set_sql_mode",
@@ -1493,15 +1492,15 @@ static struct PyGetSetDef _mysql_connection_object_getset[]  = {
 
 PyTypeObject _mysql_connection_object_t = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "_mysql.Connection",                                           /* tp_name */
-    sizeof(_mysql_connection_object),                               /* tp_basicsize */
+    STRINGIFY(MODULE_NAME) ".Connection",                          /* tp_name */
+    sizeof(_mysql_connection_object),                              /* tp_basicsize */
     0,                                                             /* tp_itemsize */
-    (destructor)_mysql_connection_object_dealloc,                   /* tp_dealloc */
+    (destructor)_mysql_connection_object_dealloc,                  /* tp_dealloc */
     0,                                                             /* tp_print */
     0,                                                             /* tp_getattr */
     0,                                                             /* tp_setattr */
     0,                                                             /* tp_reserved */
-    (reprfunc)_mysql_connection_object_repr,                        /* tp_repr */
+    (reprfunc)_mysql_connection_object_repr,                       /* tp_repr */
     0,                                                             /* tp_as_number */
     0,                                                             /* tp_as_sequence */
     0,                                                             /* tp_as_mapping */
@@ -1514,20 +1513,20 @@ PyTypeObject _mysql_connection_object_t = {
     Py_TPFLAGS_DEFAULT,                                            /* tp_flags */
     _mysql_connect__doc__,                                         /* tp_doc */
     0,                                                             /* tp_traverse */
-    (inquiry)_mysql_connection_object_clear,                        /* tp_clear */
+    (inquiry)_mysql_connection_object_clear,                       /* tp_clear */
     0,                                                             /* tp_richcompare */
     0,                                                             /* tp_weaklistoffset */
     0,                                                             /* tp_iter */
     0,                                                             /* tp_iternext */
-    _mysql_connection_object_methods,                               /* tp_methods */
-    _mysql_connection_object_members,                               /* tp_members */
-    _mysql_connection_object_getset,                                /* tp_getset */
+    _mysql_connection_object_methods,                              /* tp_methods */
+    _mysql_connection_object_members,                              /* tp_members */
+    _mysql_connection_object_getset,                               /* tp_getset */
     0,                                                             /* tp_base */
     0,                                                             /* tp_dict */
     0,                                                             /* tp_descr_get */
     0,                                                             /* tp_descr_set */
     0,                                                             /* tp_dictoffset */
-    (initproc)_mysql_connection_object__init__,                     /* tp_init */
+    (initproc)_mysql_connection_object__init__,                    /* tp_init */
     PyType_GenericAlloc,                                           /* tp_alloc */
     (newfunc)_PyObject_NewVar,                                     /* tp_new */
     PyObject_Del

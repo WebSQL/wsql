@@ -14,6 +14,13 @@
 #include <errmsg.h>
 #include "trace.h"
 
+#define JOIN(X,Y) DO_JOIN1(X,Y)
+#define DO_JOIN1(X,Y) DO_JOIN2(X,Y)
+#define DO_JOIN2(X,Y) X##Y
+
+#define DO_STRINGIFY(x) #x
+#define STRINGIFY(x) DO_STRINGIFY(x)
+
 #if PY_VERSION_HEX < 0x02050000 && !defined(PY_SSIZE_T_MIN)
 typedef int Py_ssize_t;
 #define PY_SSIZE_T_MAX INT_MAX
@@ -75,6 +82,11 @@ extern PyObject *_mysql_error_map;
 
 extern PyObject *
 _mysql_exception(_mysql_connection_object *c);
+
+extern char _mysql_format__doc__[];
+
+extern PyObject *
+_mysql_format(PyObject *self, PyObject *args);
 
 extern char _mysql_connect__doc__[];
 

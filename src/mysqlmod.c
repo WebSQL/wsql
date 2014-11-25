@@ -142,8 +142,6 @@ _mysql_debug(
     Py_RETURN_NONE;
 }
 
-static PyObject *_mysql_NULL;
-
 static char _mysql_get_client_info__doc__[] =
 "get_client_info() -- Returns a string that represents\n" \
 "the client library version.";
@@ -196,11 +194,14 @@ _mysql_methods[] = {
         METH_NOARGS,
         _mysql_server_end__doc__
     },
+    {
+        "format",
+        (PyCFunction)_mysql_format,
+        METH_VARARGS,
+        _mysql_format__doc__
+    },
     {NULL, NULL} /* sentinel */
 };
-
-#define QUOTE(X) _QUOTE(X)
-#define _QUOTE(X) #X
 
 static char _mysql__doc__[] =
 "an adaptation of the MySQL C API (mostly)\n" \
@@ -219,17 +220,17 @@ static char _mysql__doc__[] =
 PyModuleDef _mysql_module =
 {
     PyModuleDef_HEAD_INIT,
-    "_mysql",            /* name of module */
-    _mysql__doc__,      /* module documentation, may be NULL */
-    -1,                  /* size of per-interpreter state of the module,
-                            or -1 if the module keeps state in global variables. */
+    STRINGIFY(MODULE_NAME), /* name of module */
+    _mysql__doc__,          /* module documentation, may be NULL */
+    -1,                     /* size of per-interpreter state of the module,
+                               or -1 if the module keeps state in global variables. */
     _mysql_methods, NULL, NULL, NULL, NULL
 };
 
-#define PYENTRY_FUNC_NAME PyInit__mysql
+#define PYENTRY_FUNC_NAME JOIN(PyInit_, MODULE_NAME)
 #define PY_MOD_RETURN(m) return m
 #else
-#define PYENTRY_FUNC_NAME init_mysql
+#define PYENTRY_FUNC_NAME JOIN(init, MODULE_NAME)
 #define PY_MOD_RETURN(m) return
 #endif  // PY3K
 
@@ -240,30 +241,31 @@ PYENTRY_FUNC_NAME(void)
 #ifdef PY3K
     module = PyModule_Create(&_mysql_module);
 #else
-    module = Py_InitModule3("_mysql", _mysql_methods, _mysql__doc__);
+    module = Py_InitModule3(#MODULE_NAME, _mysql_methods, _mysql__doc__);
 #endif
     if (!module)
         PY_MOD_RETURN(NULL); /* this really should never happen */
 
     /* Populate final object settings */
-    if (PyType_Ready(&_mysql_connection_object_t) < 0) goto error;
-    if (PyType_Ready(&_mysql_result_object_t) < 0) goto error;
-    if (PyType_Ready(&_mysql_field_object_t) < 0) goto error;
+    if (PyType_Ready(&_mysql_connection_object_t) < 0) goto on_error;
+    if (PyType_Ready(&_mysql_result_object_t) < 0) goto on_error;
+    if (PyType_Ready(&_mysql_field_object_t) < 0) goto on_error;
 
     /* Module constants */
     if (PyModule_AddObject(module, "version_info",
-                           PyRun_String(QUOTE(version_info),
+                           PyRun_String(STRINGIFY(version_info),
                                         Py_eval_input,
                                         PyModule_GetDict(module),
-                                        PyModule_GetDict(module))) < 0) goto error;
+                                        PyModule_GetDict(module))) < 0) goto on_error;
 
-    if (PyModule_AddStringConstant(module, "__version__", QUOTE(__version__)) < 0) goto error;
+    if (PyModule_AddStringConstant(module, "__version__", STRINGIFY(__version__)) < 0) goto on_error;
 
-    if (_mysql_exceptions_add(module) < 0) goto error;
-    if (_mysql_constants_add(module) < 0) goto error;
+    if (_mysql_exceptions_add(module) < 0) goto on_error;
+    if (_mysql_constants_add(module) < 0) goto on_error;
 
     PY_MOD_RETURN(module);
-  error:
+
+  on_error:
     Py_XDECREF(module);
     PY_MOD_RETURN(NULL);
 }

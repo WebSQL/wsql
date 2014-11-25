@@ -158,15 +158,15 @@ static struct PyMemberDef _mysql_field_object_members[] = {
 
 PyTypeObject _mysql_field_object_t = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "_mysql.Field",                                                /* tp_name */
-    sizeof(_mysql_field_object),                                    /* tp_basicsize */
+    STRINGIFY(MODULE_NAME) ".Field",                               /* tp_name */
+    sizeof(_mysql_field_object),                                   /* tp_basicsize */
     0,                                                             /* tp_itemsize */
-    (destructor)_mysql_field_object_dealloc,                        /* tp_dealloc */
+    (destructor)_mysql_field_object_dealloc,                       /* tp_dealloc */
     0,                                                             /* tp_print */
     0,                                                             /* tp_getattr */
     0,                                                             /* tp_setattr */
     0,                                                             /* tp_reserved */
-    (reprfunc)_mysql_field_object_repr,                             /* tp_repr */
+    (reprfunc)_mysql_field_object_repr,                            /* tp_repr */
     0,                                                             /* tp_as_number */
     0,                                                             /* tp_as_sequence */
     0,                                                             /* tp_as_mapping */
@@ -177,22 +177,22 @@ PyTypeObject _mysql_field_object_t = {
     0,                                                             /* tp_setattro */
     0,                                                             /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT,                                            /* tp_flags */
-    _mysql_field_object__doc__,                                     /* tp_doc */
+    _mysql_field_object__doc__,                                    /* tp_doc */
     0,                                                             /* tp_traverse */
-    (inquiry)_mysql_field_object_clear,                             /* tp_clear */
+    (inquiry)_mysql_field_object_clear,                            /* tp_clear */
     0,                                                             /* tp_richcompare */
     0,                                                             /* tp_weaklistoffset */
     0,                                                             /* tp_iter */
     0,                                                             /* tp_iternext */
-    _mysql_field_object_methods,                                    /* tp_methods */
-    _mysql_field_object_members,                                    /* tp_members */
+    _mysql_field_object_methods,                                   /* tp_methods */
+    _mysql_field_object_members,                                   /* tp_members */
     0,                                                             /* tp_getset */
     0,                                                             /* tp_base */
     0,                                                             /* tp_dict */
     0,                                                             /* tp_descr_get */
     0,                                                             /* tp_descr_set */
     0,                                                             /* tp_dictoffset */
-    (initproc)_mysql_field_object__init__,                          /* tp_init */
+    (initproc)_mysql_field_object__init__,                         /* tp_init */
     PyType_GenericAlloc,                                           /* tp_alloc */
     (newfunc)_PyObject_NewVar,                                     /* tp_new */
     PyObject_Del
