@@ -1,5 +1,5 @@
 import os
-
+s
 
 def dequote(s):
     """This dequote() business is required for some older versions of
