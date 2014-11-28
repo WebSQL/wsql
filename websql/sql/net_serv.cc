@@ -549,7 +549,6 @@ net_write_command_nonblocking(NET *net, uchar command,
 {
   net_async_status status;
   ssize_t rc;
-  ssize_t len = prefix_len + packet_len;
   DBUG_ENTER(__func__);
   DBUG_DUMP("net write prefix", prefix, prefix_len);
   DBUG_DUMP("net write pkt", packet, packet_len);
@@ -561,7 +560,7 @@ net_write_command_nonblocking(NET *net, uchar command,
 
   switch (net->async_operation) {
     case NET_ASYNC_OP_IDLE:
-      MYSQL_NET_WRITE_START(len);
+      MYSQL_NET_WRITE_START((prefix_len + packet_len));
       if (!begin_packet_write_state(net, command, packet, packet_len, prefix, prefix_len)) {
         *res = 0;
         goto done;
