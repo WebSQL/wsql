@@ -1,6 +1,6 @@
 from tests import capabilities
 import unittest
-import websql
+import MySQLdb
 import warnings
 import os
 
@@ -11,7 +11,7 @@ config_file = os.path.join(os.path.dirname(__file__), 'my.cnf')
 
 class TestWebSQLCapabilities(capabilities.DatabaseTest):
 
-    db_module = websql
+    db_module = MySQLdb
     connect_args = ()
     connect_kwargs = dict(database='test', read_default_file=config_file, read_default_group='websql',
                           user='root', charset='utf8', sql_mode="ANSI,STRICT_TRANS_TABLES,TRADITIONAL")
@@ -78,7 +78,7 @@ class TestWebSQLCapabilities(capabilities.DatabaseTest):
         self.check_data_integrity(('col1 char(1)', 'col2 char(1)'), generator)
 
     def test_bug_2671682(self):
-        from websql._websql import constants
+        from MySQLdb._websql import constants
         try:
             self.cursor.execute("describe some_non_existent_table")
         except self.connection.ProgrammingError as err:
@@ -86,7 +86,7 @@ class TestWebSQLCapabilities(capabilities.DatabaseTest):
     
     def test_INSERT_VALUES(self):
         """test_INSERT_VALUES"""
-        from websql.cursors import INSERT_VALUES
+        from MySQLdb.cursors import INSERT_VALUES
         query = b"""INSERT FOO (a, b, c) VALUES (%s, %s, %s)"""
         matched = INSERT_VALUES.match(query)
         self.assertTrue(matched)

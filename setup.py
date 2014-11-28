@@ -8,10 +8,10 @@ from distutils import log
 
 class BuildWebSQL(_build_ext):
     def run(self):
-        path = os.path.abspath('extra/mysql')
+        path = os.path.abspath('websql')
         log.info("building 'websqlclient' library")
         pwd = os.getcwd()
-        temp_dir = os.path.join(self.build_temp, 'websqlclient')
+        temp_dir = os.path.join(self.build_temp, 'websql')
         self.mkpath(temp_dir)
         os.chdir(temp_dir)
         try:
@@ -20,7 +20,7 @@ class BuildWebSQL(_build_ext):
         finally:
             os.chdir(pwd)
 
-        self.include_dirs.extend([os.path.join(temp_dir, 'include'), 'extra/mysql/include'])
+        self.include_dirs.extend([os.path.join(temp_dir, 'include'), 'websql/include'])
         self.libraries.append('websqlclient')
         self.library_dirs.append(os.path.join(temp_dir, 'libmysql'))
 
@@ -80,11 +80,11 @@ module1 = Extension(MODULE_NAME,
 setup(
     ext_modules=[module1],
     py_modules=[
-        "websql._types",
-        "websql.connections",
-        "websql.converters",
-        "websql.cursors",
-        "websql.release",
-        "websql.times"
+        "MySQLdb._types",
+        "MySQLdb.connections",
+        "MySQLdb.converters",
+        "MySQLdb.cursors",
+        "MySQLdb.release",
+        "MySQLdb.times"
     ],
     cmdclass={'build_ext': BuildWebSQL})
