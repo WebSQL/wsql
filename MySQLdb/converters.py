@@ -6,31 +6,20 @@ MySQLdb type conversion module
 
 """
 
-try:
-    from ._mysql import constants
-    from .times import datetime_to_sql, timedelta_to_sql, \
-        timedelta_or_orig, datetime_or_orig, date_or_orig, \
-        timestamp_or_orig
-except SystemError:
-    from _mysql import constants
-    from times import datetime_to_sql, timedelta_to_sql, \
-        timedelta_or_orig, datetime_or_orig, date_or_orig, \
-        timestamp_or_orig
+from ._websql import constants
 
-import datetime
 from decimal import Decimal
+from math import modf
+import datetime
+import struct
+
 
 NULL = constants.NULL
 
 
 def bool_to_sql(_, value):
     """Convert a Python bool to an SQL literal."""
-    return str(int(value))
-
-
-def sql_to_set(value):
-    """Convert MySQL SET column to Python set."""
-    return {i for i in value.split(',') if i}
+    return int(value)
 
 
 def set_to_sql(connection, value):
@@ -38,25 +27,112 @@ def set_to_sql(connection, value):
     return connection.string_literal(','.join(value)).decode(connection.charset)
 
 
+def sql_to_set(value):
+    """Convert MySQL SET column to Python set."""
+    return {i for i in value.split(',') if i}
+
+
 def object_to_sql(connection, obj):
     """Convert something into a string via str().
     The result will not be quoted."""
-    return connection.escape_string(str(obj)).decode(connection.charset)
+    return str_to_sql(connection, str(obj))
 
 
-def unicode_to_sql(connection, value):
-    """Convert a unicode object to a string using the connection encoding."""
+def str_to_sql(connection, value):
+    """Convert a string object to a sql string literal by using connection encoding."""
     charset = connection.charset
-    return connection.string_literal(value.encode(charset)).decode(charset)
+    return connection.quote(value.encode(charset))
+
+
+def bytes_to_sql(connection, value):
+    """Convert a bytes object to a sql string literal"""
+    return connection.quote(value)
+
+
+def int_to_sql(_, value):
+    """Convert a bytes object to a sql int literal"""
+    return value
 
 
 def float_to_sql(_, value):
+    """Convert float to sql literal"""
     return '%.15g' % value
+
+
+def decimal_to_sql(_, value):
+    """Convert Decimal to sql literal"""
+    return value
+
+
+def sql_to_decimal(value):
+    """Convert SQL literal to Decimal"""
+    return Decimal(value.decode('ascii'))
 
 
 def none_to_sql(*_):
     """Convert None to NULL."""
     return NULL
+
+
+def timedelta_to_sql(_, obj):
+    """Convert timedelta to a SQL literal"""
+    seconds = int(obj.seconds) % 60
+    minutes = int(obj.seconds / 60) % 60
+    hours = int(obj.seconds / 3600) % 24
+    if obj.microseconds:
+        return ("'%02d:%02d:%02d.%06d'" % (hours, minutes, seconds, obj.microseconds)).encode('ascii')
+    return ("'%02d:%02d:%02d'" % (hours, minutes, seconds)).encode('ascii')
+
+
+def datetime_to_sql(_, obj):
+    """Convert a datetime to a SQL literal"""
+    return obj.strftime("'%Y-%m-%d %H:%M:%S'").encode('ascii')
+
+
+def sql_to_date(obj):
+    """Convert a SQL literal to date"""
+    return datetime.date(*map(int, obj.split(b'-')))
+
+
+def sql_to_datetime(obj):
+    """Convert a SQL literal to datetime"""
+    date_, time_ = obj.split(b' ')
+    if len(time_) > 8:
+        hms, mcs = time_.split(b'.')
+        mcs = int(mcs.ljust(6, b'0'))
+    else:
+        hms = time_
+        mcs = 0
+
+    parts = [int(i) for i in date_.split(b'-')]
+    parts.extend(map(int, hms.split(b':')))
+    parts.append(mcs)
+    return datetime.datetime(*parts)
+
+
+def sql_to_timedelta(obj):
+    """Convert a SQL literal to timedelta"""
+    hours, minutes, seconds = obj.split(b':')
+    delta = datetime.timedelta(
+        hours=int(hours),
+        minutes=int(minutes),
+        seconds=int(seconds),
+        microseconds=int(modf(float(seconds))[0] * 1000000))
+    if delta.seconds < 0:
+        return -delta
+    return delta
+
+
+def sql_to_bit(value):
+    """Returns BIT columntype as integer"""
+    if len(value) < 8:
+        value = b'\x00' * (8 - len(value)) + value
+    return struct.unpack('>Q', value)[0]
+
+
+def any_to_sql(connection, obj):
+    """Convert any object to sql literal."""
+    return str_to_sql(connection, str(obj))
 
 
 def none_if_null(func):
@@ -71,54 +147,25 @@ def none_if_null(func):
 
 int_or_None_if_NULL = none_if_null(int)
 float_or_None_if_NULL = none_if_null(float)
-Decimal_or_None_if_NULL = none_if_null(Decimal)
-SET_to_Set_or_None_if_NULL = none_if_null(sql_to_set)
-timestamp_or_None_if_NULL = none_if_null(timestamp_or_orig)
-datetime_or_None_if_NULL = none_if_null(datetime_or_orig)
-date_or_None_if_NULL = none_if_null(date_or_orig)
-timedelta_or_None_if_NULL = none_if_null(timedelta_or_orig)
-
-
-def object_to_quoted_sql(connection, obj):
-    """Convert something into a SQL string literal."""
-    if isinstance(obj, str):
-        return unicode_to_sql(connection, obj)
-    return connection.string_literal(str(obj))
-
-
-def instance_to_sql(connection, obj, conv):
-    """Convert an Instance to a string representation.  If the __str__()
-    method produces acceptable output, then you don't need to add the
-    class to conversions; it will be handled by the default
-    converter. If the exact class is not found in conv, it will use the
-    first class it can find for which obj is an instance.
-    """
-
-    if type(obj) in conv:
-        return conv[type(obj)](obj, conv)
-
-    try:
-        klass = next(key for key in conv.keys() if isinstance(obj, key))
-    except StopIteration:
-        return conv[str](obj, conv)
-
-    return conv.setdefault(type(obj), klass)(connection, obj)
-
-
-def array_to_sql(connection, obj):
-    return connection.string_literal(obj.tostring())
+decimal_or_None_if_NULL = none_if_null(sql_to_decimal)
+set_or_None_if_NULL = none_if_null(sql_to_set)
+datetime_or_None_if_NULL = none_if_null(sql_to_datetime)
+date_or_None_if_NULL = none_if_null(sql_to_date)
+timedelta_or_None_if_NULL = none_if_null(sql_to_timedelta)
+bytes_or_None_if_NULL = none_if_null(lambda x: x)
+bit_or_None_if_NULL = none_if_null(sql_to_bit)
 
 
 simple_type_encoders = {
-    int: object_to_sql,
-    float: float_to_sql,
-    type(None): none_to_sql,
-    object: instance_to_sql,
     bool: bool_to_sql,
+    bytes: bytes_to_sql,
     datetime.datetime: datetime_to_sql,
     datetime.timedelta: timedelta_to_sql,
+    float: float_to_sql,
+    int: int_to_sql,
     set: set_to_sql,
-    str: object_to_quoted_sql
+    str: str_to_sql,
+    type(None): none_to_sql
 }
 
 # This is for MySQL column types that can be converted directly
@@ -126,21 +173,32 @@ simple_type_encoders = {
 # character sets, etc.). This should always be used as the last
 # resort.
 simple_field_decoders = {
+    constants.FIELD_TYPE_TINY_BLOB: bytes_or_None_if_NULL,
+    constants.FIELD_TYPE_MEDIUM_BLOB: bytes_or_None_if_NULL,
+    constants.FIELD_TYPE_LONG_BLOB: bytes_or_None_if_NULL,
+
     constants.FIELD_TYPE_TINY: int_or_None_if_NULL,
     constants.FIELD_TYPE_SHORT: int_or_None_if_NULL,
     constants.FIELD_TYPE_LONG: int_or_None_if_NULL,
+    constants.FIELD_TYPE_INT24: int_or_None_if_NULL,
+    constants.FIELD_TYPE_LONGLONG: int_or_None_if_NULL,
+
     constants.FIELD_TYPE_FLOAT: float_or_None_if_NULL,
     constants.FIELD_TYPE_DOUBLE: float_or_None_if_NULL,
-    constants.FIELD_TYPE_DECIMAL: Decimal_or_None_if_NULL,
-    constants.FIELD_TYPE_NEWDECIMAL: Decimal_or_None_if_NULL,
-    constants.FIELD_TYPE_LONGLONG: int_or_None_if_NULL,
-    constants.FIELD_TYPE_INT24: int_or_None_if_NULL,
+
+    constants.FIELD_TYPE_DECIMAL: decimal_or_None_if_NULL,
+    constants.FIELD_TYPE_NEWDECIMAL: decimal_or_None_if_NULL,
+
     constants.FIELD_TYPE_YEAR: int_or_None_if_NULL,
-    constants.FIELD_TYPE_SET: SET_to_Set_or_None_if_NULL,
-    constants.FIELD_TYPE_TIMESTAMP: timestamp_or_None_if_NULL,
+
+    constants.FIELD_TYPE_TIMESTAMP: datetime_or_None_if_NULL,
     constants.FIELD_TYPE_DATETIME: datetime_or_None_if_NULL,
-    constants.FIELD_TYPE_TIME: timedelta_or_None_if_NULL,
     constants.FIELD_TYPE_DATE: date_or_None_if_NULL,
+    constants.FIELD_TYPE_NEWDATE: date_or_None_if_NULL,
+    constants.FIELD_TYPE_TIME: timedelta_or_None_if_NULL,
+
+    constants.FIELD_TYPE_BIT: bit_or_None_if_NULL,
+    constants.FIELD_TYPE_SET: set_or_None_if_NULL
 }
 
 # Decoder protocol
@@ -153,41 +211,57 @@ simple_field_decoders = {
 
 
 def default_decoder(*_):
-    return str
+    return bytes_or_None_if_NULL
 
 
-def default_encoder(_):
-    return object_to_quoted_sql
+def default_encoder(_, value):
+    """Convert an Instance to a string representation.  If the __str__()
+    method produces acceptable output, then you don't need to add the
+    class to conversions; it will be handled by the default
+    converter. If the exact class is not found in conv, it will use the
+    first class it can find for which obj is an instance.
+    """
+    try:
+        conv = next(key for key in simple_type_encoders.keys() if isinstance(value, key))
+    except StopIteration:
+        return any_to_sql
+
+    return simple_type_encoders.setdefault(type(value), conv)
 
 
 def simple_decoder(_, field):
     return simple_field_decoders.get(field.type, None)
 
 
-def simple_encoder(value):
+def simple_encoder(_, value):
     return simple_type_encoders.get(type(value), None)
 
-character_types = [
+
+character_types = {
     constants.FIELD_TYPE_BLOB,
     constants.FIELD_TYPE_STRING,
     constants.FIELD_TYPE_VAR_STRING,
     constants.FIELD_TYPE_VARCHAR,
-]
+}
 
 
 def character_decoder(connection, field):
     if field.type not in character_types:
         return None
 
+    if field.flags & constants.FLAG_BINARY:
+        return bytes_or_None_if_NULL
+
+    if field.flags & constants.FLAG_SET:
+        return set_or_None_if_NULL
+
     charset = connection.charset
 
-    def char_to_unicode(s):
-        return s if s is None else s.encode(charset)
+    def char_to_str(s):
+        return s if s is None else s.decode(charset)
 
-    if field.charsetnr == 63:  # BINARY
-        return char_to_unicode
+    return char_to_str
 
-    return str
 
 default_decoders = [
     character_decoder,
@@ -206,7 +280,7 @@ def get_codec(connection, field, codecs):
         func = c(connection, field)
         if func:
             return func
-    # the default codec is guaranteed to work
+    raise connection.NotSupportedError(("could not encode as SQL", field))
 
 
 def iter_row_decoder(decoders, row):

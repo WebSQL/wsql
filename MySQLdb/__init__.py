@@ -4,7 +4,7 @@ MySQLdb
 A DB API v2.0 compatible interface to MySQL
 -------------------------------------------
 
-This package is a wrapper around _mysql, which mostly implements the
+This package is a wrapper around _websql, which mostly implements the
 MySQL C API.
 
 See the C API specification and the MySQL documentation for more info

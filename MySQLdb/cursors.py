@@ -7,8 +7,8 @@ create Cursors direction; use connection.cursor() instead.
 
 """
 
-from ._mysql import constants
-from ._mysql import exceptions
+from ._websql import constants
+from ._websql import exceptions
 from .converters import get_codec
 from warnings import warn
 import asyncio
@@ -16,9 +16,9 @@ import re
 import weakref
 
 
-INSERT_VALUES = re.compile(r"(?P<start>.+values\s*)"
-                           r"(?P<values>\(((?<!\\)'[^\)]*?\)[^\)]*(?<!\\)?'|[^\(\)]|(?:\([^\)]*\)))+\))"
-                           r"(?P<end>.*)", re.I)
+INSERT_VALUES = re.compile(br"(?P<start>.+values\s*)"
+                           br"(?P<values>\(((?<!\\)'[^\)]*?\)[^\)]*(?<!\\)?'|[^\(\)]|(?:\([^\)]*\)))+\))"
+                           br"(?P<end>.*)", re.I)
 
 
 class CursorBase(object):
@@ -73,7 +73,7 @@ class CursorBase(object):
         result = connection.get_result(self.use_result)
         if result is not None:
             decoders = self.decoders
-            self._row_decoders = tuple((get_codec(connection, field, decoders) for field in result.fields))
+            self._row_decoders = tuple(get_codec(connection, field, decoders) for field in result.fields)
             self._rowcount = result.num_rows
             self._result = result
 
@@ -87,17 +87,11 @@ class CursorBase(object):
 
     def _encode(self, connection, obj):
         """
-        Given an object obj, returns an SQL literal as a string.
-        Non-standard.
+        Given an object obj, returns an SQL literal as a string. Non-standard.
         :param obj: object to encode
-        :return string literal
+        :return sql literal
         """
-        for encoder in self.encoders:
-            f = encoder(obj)
-            if f:
-                return f(connection, obj)
-
-        self.errorhandler(self.NotSupportedError("could not encode as SQL", obj))
+        return get_codec(connection, obj, self.encoders[:-1])(connection, obj)
 
     @property
     def connection(self):
@@ -177,7 +171,6 @@ class Cursor(CursorBase):
         if connection.warning_count:
             warnings = connection.show_warnings()
             if warnings:
-                #TODO mysql warning is a tuple, but mysql does not handle it
                 for warning in map(connection.Warning, warnings):
                     self.messages.append(warning)
                     warn(warning, stacklevel=3)
@@ -210,22 +203,22 @@ class Cursor(CursorBase):
                      parameter placeholder in the query. If a mapping is used,
                      %(key)s must be used as the placeholder.
         """
-        self._push()
         connection = self.connection
-        charset = connection.charset
-        if isinstance(query, str):
-            query = query.encode(charset)
         try:
+            if isinstance(query, str):
+                query = query.encode(connection.charset)
+
             if args is not None:
-                query = query % tuple((get_codec(connection, a, self.encoders)(connection, a) for a in args))
+                query = connection.format(query, tuple(get_codec(connection, a, self.encoders)(connection, a) for a in args))
             self._query(query)
+
+            if not self._defer_warnings:
+                self.warning_check()
+
         except TypeError as e:
             self.errorhandler(self.ProgrammingError(str(e)))
         except Exception as e:
             self.errorhandler(e)
-
-        if not self._defer_warnings:
-            self.warning_check()
 
     def executemany(self, query, args):
         """
@@ -241,9 +234,9 @@ class Cursor(CursorBase):
         if not args:
             return
 
-        charset = connection.charset
         if isinstance(query, str):
-            query = query.encode(charset)
+            query = query.encode(connection.charset)
+
         matched = INSERT_VALUES.match(query)
         if not matched:
             rowcount = 0
@@ -258,16 +251,17 @@ class Cursor(CursorBase):
         end = matched.group('end')
 
         try:
-            sql_params = tuple(values % tuple(get_codec(connection, a, self.encoders)(connection, a) for a in row) for row in args)
-            multi_row_query = '\n'.join([start, ',\n'.join(sql_params), end])
+            sql_params = (connection.format(values, tuple(get_codec(connection, a, self.encoders)(connection, a) for a in row)) for row in args)
+            multi_row_query = b'\n'.join([start, b',\n'.join(sql_params), end])
             self._query(multi_row_query)
+
+            if not self._defer_warnings:
+                self.warning_check()
+
         except TypeError as e:
             self.errorhandler(self.ProgrammingError(e))
         except Exception as e:
             self.errorhandler(e)
-
-        if not self._defer_warnings:
-            self.warning_check()
 
     def callproc(self, procname, args=()):
         """
@@ -280,21 +274,30 @@ class Cursor(CursorBase):
         """
 
         connection = self.connection
-        charset = connection.charset
-        for index, arg in enumerate(args):
-            query = "SET @_%s_%d=%s" % (procname, index, self._encode(connection, arg))
-            if isinstance(query, str):
-                query = query.encode(charset)
-            self._query(query)
-            self.nextset()
+        try:
+            if isinstance(procname, str):
+                procname = procname.encode(connection.charset)
 
-        query = "CALL %s(%s)" % (procname, ','.join(['@_%s_%d' % (procname, i) for i in range(len(args))]))
-        if isinstance(query, str):
-            query = query.encode(charset)
-        self._query(query)
-        if not self._defer_warnings:
-            self.warning_check()
-        return args
+            for index, arg in enumerate(args):
+                query = connection.format(b"SET @_%s_%d=%s", (procname, index, self._encode(connection, arg)))
+                self._query(query)
+                self.nextset()
+
+            query = connection.format(b"CALL %s(%s)",
+                                            (procname,
+                                             b','.join(connection.format(
+                                                 b'@_%s_%d',
+                                                 (procname, i)) for i in range(len(args)))))
+
+            self._query(query)
+
+            if not self._defer_warnings:
+                self.warning_check()
+            return args
+        except TypeError as e:
+            self.errorhandler(self.ProgrammingError(e))
+        except Exception as e:
+            self.errorhandler(e)
 
     def __iter__(self):
         return iter(self.fetchone, None)
@@ -400,7 +403,6 @@ class CursorAsync(CursorBase):
         if connection.warning_count:
             warnings = yield from connection.show_warnings()
             if warnings:
-                #TODO mysql warning is a tuple, but mysql does not handle it
                 for warning in map(connection.Warning, warnings):
                     self.messages.append(warning)
                     warn(warning, stacklevel=3)
@@ -435,22 +437,22 @@ class CursorAsync(CursorBase):
                      parameter placeholder in the query. If a mapping is used,
                      %(key)s must be used as the placeholder.
         """
-        self._push()
         connection = self.connection
-        charset = connection.charset
-        if isinstance(query, str):
-            query = query.encode(charset)
         try:
+            if isinstance(query, str):
+                query = query.encode(connection.charset)
+
             if args is not None:
-                query = query % tuple((get_codec(connection, a, self.encoders)(connection, a) for a in args))
+                query = connection.format(query, tuple(get_codec(connection, a, self.encoders)(connection, a) for a in args))
+
             yield from self._query(query)
+
+            if not self._defer_warnings:
+                yield from self.warning_check()
         except TypeError as e:
             self.errorhandler(self.ProgrammingError(str(e)))
         except Exception as e:
             self.errorhandler(e)
-
-        if not self._defer_warnings:
-            yield from self.warning_check()
 
     @asyncio.coroutine
     def executemany(self, query, args):
@@ -467,9 +469,9 @@ class CursorAsync(CursorBase):
         if not args:
             return
 
-        charset = connection.charset
         if isinstance(query, str):
-            query = query.encode(charset)
+            query = query.encode(connection.charset)
+
         matched = INSERT_VALUES.match(query)
         if not matched:
             for row in args:
@@ -481,16 +483,16 @@ class CursorAsync(CursorBase):
         end = matched.group('end')
 
         try:
-            sql_params = tuple(values % tuple(get_codec(connection, a, self.encoders)(connection, a) for a in row) for row in args)
-            multi_row_query = '\n'.join([start, ',\n'.join(sql_params), end])
+            sql_params = (connection.format(values, tuple(get_codec(connection, a, self.encoders)(connection, a) for a in row)) for row in args)
+            multi_row_query = b'\n'.join([start, b',\n'.join(sql_params), end])
             yield from self._query(multi_row_query)
+
+            if not self._defer_warnings:
+                yield from self.warning_check()
         except TypeError as e:
             self.errorhandler(self.ProgrammingError(e))
         except Exception as e:
             self.errorhandler(e)
-
-        if not self._defer_warnings:
-            yield from self.warning_check()
 
     def callproc(self, procname, args=()):
         """
@@ -503,21 +505,28 @@ class CursorAsync(CursorBase):
         """
 
         connection = self.connection
-        charset = connection.charset
-        for index, arg in enumerate(args):
-            query = "SET @_%s_%d=%s" % (procname, index, self._encode(connection, arg))
-            if isinstance(query, str):
-                query = query.encode(charset)
-            yield from self._query(query)
-            yield from self.nextset()
+        try:
+            if isinstance(procname, str):
+                procname = procname.encode(connection.charset)
 
-        query = "CALL %s(%s)" % (procname, ','.join(['@_%s_%d' % (procname, i) for i in range(len(args))]))
-        if isinstance(query, str):
-            query = query.encode(charset)
-        yield from self._query(query)
-        if not self._defer_warnings:
-            yield from self.warning_check()
-        return args
+            for index, arg in enumerate(args):
+                query = connection.format(b"SET @_%s_%d=%s", (procname, index, self._encode(connection, arg)))
+                yield from self._query(query)
+                yield from self.nextset()
+
+            query = connection.format(b"CALL %s(%s)", (procname,
+                                                             b','.join(connection.format(
+                                                                 b'@_%s_%d',
+                                                                 ((procname, i) for i in range(len(args)))))))
+            yield from self._query(query)
+            if not self._defer_warnings:
+                yield from self.warning_check()
+
+            return args
+        except TypeError as e:
+            self.errorhandler(self.ProgrammingError(e))
+        except Exception as e:
+            self.errorhandler(e)
 
     @asyncio.coroutine
     def _query(self, query):

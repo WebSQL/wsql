@@ -9,9 +9,9 @@ override Connection.default_cursor with a non-standard Cursor class.
 
 """
 
-from . import _mysql
-from ._mysql import constants
-from ._mysql import exceptions
+from . import _websql
+from ._websql import constants
+from ._websql import exceptions
 
 import weakref
 import asyncio
@@ -106,7 +106,6 @@ def default_error_handler(obj, error):
     """
     if obj:
         obj.messages.append(error)
-    obj.close()
     raise error
 
 
@@ -120,6 +119,7 @@ class ConnectionBase(object):
     InternalError = InternalError
     ProgrammingError = ProgrammingError
     NotSupportedError = NotSupportedError
+    Warning = Warning
 
     errorhandler = default_error_handler
     _db = None
@@ -130,22 +130,22 @@ class ConnectionBase(object):
                  row_formatter=None,
                  client_flag=None, **kwargs):
 
-        from ._mysql import constants
         from .converters import default_decoders, default_encoders, default_row_formatter
 
         self.cursorclass = cursorclass
         self.encoders = default_encoders if encoders is None else encoders
         self.decoders = default_decoders if decoders is None else decoders
         self.row_formatter = default_row_formatter if row_formatter is None else row_formatter
+        self.format = _websql.format
 
         client_flag = client_flag or 0
-        client_version = tuple((int(n) for n in _mysql.get_client_info().split('.')[:2]))
+        client_version = tuple((int(n) for n in _websql.get_client_info().split('.')[:2]))
         if client_version >= (4, 1):
             client_flag |= constants.CLIENT_MULTI_STATEMENTS
         if client_version >= (5, 0):
             client_flag |= constants.CLIENT_MULTI_RESULTS
 
-        self._db = _mysql.connect(*args, client_flag=client_flag, **kwargs)
+        self._db = _websql.connect(*args, client_flag=client_flag, **kwargs)
         self.messages = []
         self._active_cursor = None
         self._server_version = None
@@ -181,10 +181,11 @@ class Connection(ConnectionBase):
         super().__init__(Cursor, *args, **kwargs)
 
         if charset:
-            self._db.character_set_name = charset
+            self._db.charset = charset
         if sql_mode:
             self._db.set_sql_mode(sql_mode)
 
+        self._db.autocommit = False
         self._server_version = tuple(int(n) for n in self._db.server_info.split('.')[:2])
 
     def __enter__(self):
@@ -195,6 +196,11 @@ class Connection(ConnectionBase):
             self.rollback()
         else:
             self.commit()
+
+    def query(self, query):
+        if isinstance(query, str):
+            query = query.encode(self._db.charset)
+        return self._db.query(query)
 
     def show_warnings(self):
         """
@@ -236,6 +242,7 @@ class ConnectionAsync(ConnectionBase):
             self._db.character_set_name = charset
         if sql_mode:
             self._db.set_sql_mode(sql_mode)
+        self._db.autocommit = False
 
     def start(self):
         """
@@ -250,6 +257,8 @@ class ConnectionAsync(ConnectionBase):
         :param query: string query
         :return: promise
         """
+        if isinstance(query, str):
+            query = query.encode(self._db.charset)
         return self.promise(self._db.query_async, query)
 
     def next_result(self):
@@ -341,11 +350,6 @@ class ConnectionAsync(ConnectionBase):
                 raise RuntimeError("Unexpected async status: %d" % status)
         except Exception as exc:
             fut.set_exception(exc)
-
-    def now(self, value):
-        fut = self._Future()
-        fut.set_result(value)
-        return fut
 
     def promise(self, callback, *args):
         fut = self._Future(loop=self._loop)

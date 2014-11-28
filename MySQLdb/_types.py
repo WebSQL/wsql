@@ -6,10 +6,10 @@
 @since    $Id: $
 """
 
-from ._mysql import constants as __constatnts
+from ._websql import constants as __constatnts
 
 __all__ = ["STRING", "BINARY", "NUMBER", "DATE", "DATETIME",
-           "TIME", "TIMESTAMP", "ROWID"]
+           "TIME", "TIMESTAMP", "ROWID", "Binary"]
 
 
 class DBAPISet(frozenset):
@@ -22,6 +22,8 @@ class DBAPISet(frozenset):
             return not self.difference(other)
         return other in self
 
+
+Binary = bytes
 
 STRING = DBAPISet([__constatnts.FIELD_TYPE_ENUM, __constatnts.FIELD_TYPE_STRING, __constatnts.FIELD_TYPE_VAR_STRING])
 BINARY = DBAPISet([__constatnts.FIELD_TYPE_BLOB, __constatnts.FIELD_TYPE_LONG_BLOB,
