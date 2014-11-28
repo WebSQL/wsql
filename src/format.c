@@ -74,15 +74,14 @@ _mysql_format_write_object(struct _mysql_formatter_t* ctx, PyObject* o) {
 
     Py_ssize_t len = PyBytes_GET_SIZE(bytes);
 
-    if (ctx->out_pos + len == ctx->out_len && _mysql_format_resize_output(ctx, (ctx->out_len + len) << 1) < 0)
+    if (ctx->out_pos + len > ctx->out_len && _mysql_format_resize_output(ctx, (ctx->out_len + len) << 1) < 0)
       return -1;
 
     char* data = PyBytes_AS_STRING(bytes);
 
-    for (Py_ssize_t i = 0; i < len; ++i)
-        ctx->out_data[ctx->out_pos + i] = data[i];
+    for (Py_ssize_t i = 0; i < len; ++i, ++ctx->out_pos)
+        ctx->out_data[ctx->out_pos] = data[i];
 
-    ctx->out_pos += len;
     Py_DECREF(bytes);
     return 0;
 }

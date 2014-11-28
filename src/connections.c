@@ -31,7 +31,7 @@ _mysql_connection_object__init__(
     };
 
     self->open = 0;
-    self->autocommit = 1;
+    self->autocommit = 0;
     CHECK_SERVER(-1);
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|ssssIsIisssIOii:connect",
@@ -205,7 +205,7 @@ _mysql_connection_object_escape_string(
     Py_ssize_t input_size;
     unsigned long output_size;
     char* input_string;
-    if (!PyArg_ParseTuple(args, "s#:escape_string", &input_string, &input_size))
+    if (!PyArg_ParseTuple(args, "s#:escape", &input_string, &input_size))
         return NULL;
 
     if (!(output = PyBytes_FromStringAndSize(NULL, input_size << 1)))
@@ -218,15 +218,15 @@ _mysql_connection_object_escape_string(
     return output;
 }
 
-char _mysql_connection_object_string_literal__doc__[] =
-"string_literal(s) -- converts string s into a SQL string literal.\n" \
+char _mysql_connection_object_string_quote__doc__[] =
+"quote(s) -- converts string s into a SQL string literal.\n" \
 "This means, any special SQL characters are escaped, and it is enclosed\n" \
 "within single quotes. In other words, it performs:\n" \
 "\n" \
-"\"'%s'\" % escape_string(s)\n";
+"\"'%s'\" % escape(s)\n";
 
 static PyObject *
-_mysql_connection_object_string_literal(
+_mysql_connection_object_string_quote(
     _mysql_connection_object *self,
     PyObject *args)
 {
@@ -234,7 +234,7 @@ _mysql_connection_object_string_literal(
     Py_ssize_t input_size;
     unsigned long output_size;
     char *input_string, *output_string;
-    if (!PyArg_ParseTuple(args, "s#:escape_string", &input_string, &input_size))
+    if (!PyArg_ParseTuple(args, "s#:quote", &input_string, &input_size))
         return NULL;
 
     if (!(output = PyBytes_FromStringAndSize(NULL, (input_size << 1) + 2))) {
@@ -1237,10 +1237,10 @@ static PyMethodDef _mysql_connection_object_methods[] = {
         _mysql_connection_object_escape_string__doc__
     },
     {
-        "literal",
-        (PyCFunction)_mysql_connection_object_string_literal,
+        "quote",
+        (PyCFunction)_mysql_connection_object_string_quote,
         METH_VARARGS,
-        _mysql_connection_object_string_literal__doc__
+        _mysql_connection_object_string_quote__doc__
     },
     {
         "get_result",

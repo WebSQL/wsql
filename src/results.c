@@ -149,7 +149,7 @@ _mysql_convert_row(
 
     for (i=0; i<n; ++i) {
         if (row[i]) {
-            v = PyString_FromStringAndSize(row[i], length[i]);
+            v = PyBytes_FromStringAndSize(row[i], length[i]);
             if (!v)
                 goto on_error;
         } else /* NULL */ {
