@@ -9,9 +9,9 @@ override Connection.default_cursor with a non-standard Cursor class.
 
 """
 
-from . import _websql
-from ._websql import constants
-from ._websql import exceptions
+import _websql
+from _websql import constants
+from _websql import exceptions
 
 import weakref
 import asyncio

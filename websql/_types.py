@@ -6,7 +6,7 @@
 @since    $Id: $
 """
 
-from ._websql import constants as __constatnts
+from _websql import constants as __constatnts
 
 __all__ = ["STRING", "BINARY", "NUMBER", "DATE", "DATETIME",
            "TIME", "TIMESTAMP", "ROWID", "Binary"]

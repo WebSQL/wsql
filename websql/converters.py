@@ -6,7 +6,7 @@ MySQLdb type conversion module
 
 """
 
-from ._websql import constants
+from _websql import constants
 
 from decimal import Decimal
 from math import modf

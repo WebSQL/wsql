@@ -7,8 +7,8 @@ create Cursors direction; use connection.cursor() instead.
 
 """
 
-from ._websql import constants
-from ._websql import exceptions
+from _websql import constants
+from _websql import exceptions
 from .converters import get_codec
 from warnings import warn
 import asyncio
