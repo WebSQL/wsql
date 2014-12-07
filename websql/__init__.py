@@ -20,11 +20,12 @@ from .release import __version__, version_info, __author__
 from .connections import *
 from .times import *
 from ._types import *
+from mysql.connector import cursor
 
 __all__ = [
     'connect', 'apilevel', 'threadsafety', 'paramstyle',
     'Warning', 'Error', 'InterfaceError', 'DatabaseError', 'DataError', 'OperationalError',
-    'IntegrityError', 'InternalError', 'ProgrammingError', 'NotSupportedError',
+    'IntegrityError', 'InternalError', 'ProgrammingError', 'NotSupportedError', 'StandardError',
     'Date', 'Time', 'Timestamp', 'DateFromTicks', 'TimeFromTicks', 'TimestampFromTicks',
     'Binary', 'STRING', 'BINARY', 'NUMBER', 'DATETIME', 'ROWID'
 ]

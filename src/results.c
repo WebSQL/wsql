@@ -23,11 +23,13 @@ _mysql_result_object_get_fields(
     for (i=0; i<num_fields; ++i) {
         if (!(args2 = Py_BuildValue("(Oi)", self, i)))
             goto on_error;
+
         if (!(field = Py_ALLOC(_mysql_field_object, _mysql_field_object_t)))
             goto on_error;
 
         if (_mysql_field_object__init__(field, args2, kwargs2))
             goto on_error;
+
         Py_DECREF(args2);
         PyTuple_SET_ITEM(fields, i, (PyObject *) field);
     }
@@ -70,39 +72,46 @@ _mysql_result_object__init__(
     Py_BEGIN_ALLOW_THREADS ;
     result = use ? mysql_use_result(&(connection->connection)) : mysql_store_result(&(connection->connection));
     self->result = result;
+    self->more_rows = result ? 1 : 0;
+    self->use = use;
     Py_END_ALLOW_THREADS;
 
     self->connection = (PyObject *) connection;
     Py_INCREF(self->connection);
-    self->use = use;
 
-    if (!result)
-        return 0;
-
+    if (!result) {
+        if (mysql_field_count(&(connection->connection)) == 0)
+            return 0;
+        _mysql_exception(connection);
+        return -1;
+    }
     n = mysql_num_fields(result);
     self->num_fields = n;
     self->fields = _mysql_result_object_get_fields(self, n);
     return 0;
 }
 
-static char _mysql_result_object_describe__doc__[] =
-"Returns the sequence of 7-tuples required by the DB-API for\n" \
+static char _mysql_result_object_description__doc__[] =
+"the sequence of 7-tuples required by the DB-API for\n" \
 "the Cursor.description attribute.\n";
 
 static PyObject *
-_mysql_result_object_describe(
-    _mysql_result_object *self)
+_mysql_result_object_description(
+    _mysql_result_object *self,
+    void* closure)
 {
     PyObject *result;
     MYSQL_FIELD *fields;
     unsigned int i, n;
 
     CHECK_RESULT(self, NULL);
+
     n = self->num_fields;
-    fields = mysql_fetch_fields(self->result);
 
     if (!(result = PyTuple_New(n)))
         return NULL;
+
+    fields = mysql_fetch_fields(self->result);
 
     for (i=0; i<n; ++i) {
         PyObject *field_desc;
@@ -138,6 +147,8 @@ _mysql_convert_row(
     if (!row) {
       if (mysql_errno(&(RESULT_CONNECTION(self)->connection)))
         return _mysql_exception(RESULT_CONNECTION(self));
+
+      self->more_rows = 0;
       Py_RETURN_NONE;
     }
 
@@ -193,14 +204,17 @@ _mysql_result_object_clear(
     _mysql_result_object *self)
 {
     TRACE1("%p", self);
-    Py_XDECREF(self->fields);
-    self->fields = NULL;
-    Py_XDECREF(self->connection);
-    self->connection = NULL;
+
     if (self->result) {
         mysql_free_result(self->result);
         self->result = NULL;
     }
+
+    Py_XDECREF(self->fields);
+    self->fields = NULL;
+
+    Py_XDECREF(self->connection);
+    self->connection = NULL;
     return 0;
 }
 
@@ -211,7 +225,9 @@ static PyObject *
 _mysql_result_object_free(
     _mysql_result_object *self)
 {
+    TRACE2("%p: %p", self, self->result);
     CHECK_RESULT(self, NULL);
+
     if (!self->result) {
         PyErr_SetString(_mysql_programming_error, "already destroyed.");
         return NULL;
@@ -442,12 +458,6 @@ static PyMethodDef _mysql_result_object_methods[] = {
         _mysql_result_object_row_tell__doc__
     },
     {
-        "describe",
-        (PyCFunction)_mysql_result_object_describe,
-        METH_NOARGS,
-        _mysql_result_object_describe__doc__
-    },
-    {
         "fetch_row",
         (PyCFunction)_mysql_result_object_fetch_row,
         METH_NOARGS,
@@ -506,6 +516,13 @@ static struct PyMemberDef _mysql_result_object_members[] = {
         READONLY,
         "True if mysql_use_result() was used; False if mysql_store_result() was used"
     },
+    {
+        "more_rows",
+        T_INT,
+        offsetof(_mysql_result_object, more_rows),
+        READONLY,
+        "True if there is more rows, otherwise False"
+    },
     {NULL} /* Sentinel */
 };
 
@@ -515,6 +532,13 @@ static struct PyGetSetDef _mysql_result_object_getset[]  = {
         (getter)_mysql_result_object_num_rows,
         NULL,
         _mysql_result_object_num_rows__doc__,
+        NULL
+    },
+    {
+        "description",
+        (getter)_mysql_result_object_description,
+        NULL,
+        _mysql_result_object_description__doc__,
         NULL
     },
     {NULL} /* Sentinel */

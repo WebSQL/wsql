@@ -1,5 +1,5 @@
 """
-MySQLdb Connections
+WebSQL Connections
 -------------------
 
 This module implements connections for MySQLdb. Presently there is
@@ -9,27 +9,26 @@ override Connection.default_cursor with a non-standard Cursor class.
 
 """
 
+from .converters import default_decoders, default_encoders, default_row_formatter
 import _websql
-from _websql import constants
-from _websql import exceptions
-
-import weakref
 import asyncio
+import weakref
 
 
 __all__ = ['connect', 'Warning', 'Error', 'InterfaceError', 'DatabaseError', 'DataError', 'OperationalError',
-           'IntegrityError', 'InternalError', 'ProgrammingError', 'NotSupportedError']
+           'IntegrityError', 'InternalError', 'ProgrammingError', 'NotSupportedError', 'StandardError']
 
-Warning = exceptions.Warning
-Error = exceptions.Error
-InterfaceError = exceptions.InterfaceError
-DatabaseError = exceptions.DatabaseError
-DataError = exceptions.DataError
-OperationalError = exceptions.OperationalError
-IntegrityError = exceptions.IntegrityError
-InternalError = exceptions.InternalError
-ProgrammingError = exceptions.ProgrammingError
-NotSupportedError = exceptions.NotSupportedError
+Warning = _websql.exceptions.Warning
+Error = _websql.exceptions.Error
+InterfaceError = _websql.exceptions.InterfaceError
+DatabaseError = _websql.exceptions.DatabaseError
+DataError = _websql.exceptions.DataError
+OperationalError = _websql.exceptions.OperationalError
+IntegrityError = _websql.exceptions.IntegrityError
+InternalError = _websql.exceptions.InternalError
+ProgrammingError = _websql.exceptions.ProgrammingError
+NotSupportedError = _websql.exceptions.NotSupportedError
+StandardError = _websql.exceptions.StandardError
 
 
 def connect(*args, nonblocking=None, **kwargs):
@@ -91,37 +90,22 @@ def connection_promise(*args, sql_mode=None, charset=None, **kwargs):
 
     connection = ConnectionAsync(*args, **kwargs)
     yield from connection.start()
-    connection.setup(sql_mode, charset)
+    connection.setup(charset, sql_mode)
     return connection
 
 
-def default_error_handler(obj, error):
-    """
-    If cursor is not None, (errorclass, errorvalue) is appended to
-    cursor.messages; otherwise it is appended to connection.messages. Then
-    errorclass is raised with errorvalue as the value.
-
-    You can override this with your own error handler by assigning it to the
-    instance.
-    """
-    if obj:
-        obj.messages.append(error)
-    raise error
-
-
 class ConnectionBase(object):
-    Error = Error
-    InterfaceError = InterfaceError
-    DatabaseError = DatabaseError
-    DataError = DataError
-    OperationalError = OperationalError
-    IntegrityError = IntegrityError
-    InternalError = InternalError
-    ProgrammingError = ProgrammingError
-    NotSupportedError = NotSupportedError
-    Warning = Warning
+    Error = _websql.exceptions.Error
+    InterfaceError = _websql.exceptions.InterfaceError
+    DatabaseError = _websql.exceptions.DatabaseError
+    DataError = _websql.exceptions.DataError
+    OperationalError = _websql.exceptions.OperationalError
+    IntegrityError = _websql.exceptions.IntegrityError
+    InternalError = _websql.exceptions.InternalError
+    ProgrammingError = _websql.exceptions.ProgrammingError
+    NotSupportedError = _websql.exceptions.NotSupportedError
+    Warning = _websql.exceptions.Warning
 
-    errorhandler = default_error_handler
     _db = None
 
     def __init__(self, cursorclass, *args,
@@ -129,8 +113,6 @@ class ConnectionBase(object):
                  decoders=None,
                  row_formatter=None,
                  client_flag=None, **kwargs):
-
-        from .converters import default_decoders, default_encoders, default_row_formatter
 
         self.cursorclass = cursorclass
         self.encoders = default_encoders if encoders is None else encoders
@@ -141,15 +123,14 @@ class ConnectionBase(object):
         client_flag = client_flag or 0
         client_version = tuple((int(n) for n in _websql.get_client_info().split('.')[:2]))
         if client_version >= (4, 1):
-            client_flag |= constants.CLIENT_MULTI_STATEMENTS
+            client_flag |= _websql.constants.CLIENT_MULTI_STATEMENTS
         if client_version >= (5, 0):
-            client_flag |= constants.CLIENT_MULTI_RESULTS
+            client_flag |= _websql.constants.CLIENT_MULTI_RESULTS
 
         self._db = _websql.connect(*args, client_flag=client_flag, **kwargs)
         self.messages = []
-        self._active_cursor = None
         self._server_version = None
-        weakref.finalize(self, lambda db: not db.closed and db.close(), db=self._db)
+        weakref.finalize(self, lambda db: db.closed or db.close(), db=self._db)
 
     def __getattr__(self, item):
         return getattr(self._db, item)
@@ -161,16 +142,10 @@ class ConnectionBase(object):
             cursorclass parameter is used to create the Cursor. By default,
             self.cursorclass=cursors.Cursor is used.
         """
-        active_cursor = self._active_cursor and self._active_cursor()
-        if active_cursor:
-            self._active_cursor.close()
-
         encoders = self.encoders
         decoders = self.decoders
         row_formatter = self.row_formatter
-        active_cursor = self.cursorclass(self, encoders, decoders, row_formatter)
-        self._active_cursor = weakref.ref(active_cursor)
-        return active_cursor
+        return self.cursorclass(self, encoders, decoders, row_formatter)
 
 
 class Connection(ConnectionBase):
@@ -224,11 +199,11 @@ class Connection(ConnectionBase):
 
 class ConnectionAsync(ConnectionBase):
     _Future = asyncio.Future
-    NET_ASYNC_WRITE = constants.NET_ASYNC_WRITE
-    NET_ASYNC_READ = constants.NET_ASYNC_READ
-    NET_ASYNC_CONNECT = constants.NET_ASYNC_CONNECT
-    NET_ASYNC_COMPLETE = constants.NET_ASYNC_COMPLETE
-    NET_ASYNC_NOT_READY = constants.NET_ASYNC_NOT_READY
+    NET_ASYNC_WRITE = _websql.constants.NET_ASYNC_WRITE
+    NET_ASYNC_READ = _websql.constants.NET_ASYNC_READ
+    NET_ASYNC_CONNECT = _websql.constants.NET_ASYNC_CONNECT
+    NET_ASYNC_COMPLETE = _websql.constants.NET_ASYNC_COMPLETE
+    NET_ASYNC_NOT_READY = _websql.constants.NET_ASYNC_NOT_READY
 
     def __init__(self, *args, loop=None, **kwargs):
         from .cursors import CursorAsync
@@ -239,7 +214,7 @@ class ConnectionAsync(ConnectionBase):
     def setup(self, charset, sql_mode):
         self._server_version = tuple(int(n) for n in self._db.server_info.split('.')[:2])
         if charset:
-            self._db.character_set_name = charset
+            self._db.charset = charset
         if sql_mode:
             self._db.set_sql_mode(sql_mode)
         self._db.autocommit = False
@@ -257,8 +232,6 @@ class ConnectionAsync(ConnectionBase):
         :param query: string query
         :return: promise
         """
-        if isinstance(query, str):
-            query = query.encode(self._db.charset)
         return self.promise(self._db.query_async, query)
 
     def next_result(self):

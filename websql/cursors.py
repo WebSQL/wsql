@@ -1,5 +1,5 @@
 """
-MySQLdb Cursors
+WebSQL Cursors
 ---------------
 
 This module implements the Cursor class. You should not try to
@@ -7,10 +7,9 @@ create Cursors direction; use connection.cursor() instead.
 
 """
 
-from _websql import constants
-from _websql import exceptions
 from .converters import get_codec
 from warnings import warn
+import _websql
 import asyncio
 import re
 import weakref
@@ -21,69 +20,59 @@ INSERT_VALUES = re.compile(br"(?P<start>.+values\s*)"
                            br"(?P<end>.*)", re.I)
 
 
-class CursorBase(object):
+class CursorBase:
     """
     A base for Cursor classes.
     """
 
-    use_result = False
+    _use_result = False
     _defer_warnings = False
 
-    ProgrammingError = exceptions.ProgrammingError
-    StandardError = exceptions.StandardError
-    NotSupportedError = exceptions.NotSupportedError
+    ProgrammingError = _websql.exceptions.ProgrammingError
+    StandardError = _websql.exceptions.StandardError
+    NotSupportedError = _websql.exceptions.NotSupportedError
 
     def __init__(self, connection, encoders, decoders, row_formatter):
         self.messages = []
         self.encoders = encoders
         self.decoders = decoders
         self.row_formatter = row_formatter
-        self.errorhandler = connection.errorhandler
         self.arraysize = 1
         self._rowcount = -1
         self._connection = weakref.ref(connection)
-        self._executed = None
         self._result = None
-        self._pending_results = []
         self._warnings = 0
         self._info = None
         self._row_decoders = ()
 
-    def _check_executed(self):
-        """Ensure that .execute() has been called."""
-        if not self._executed:
-            self.errorhandler(self.ProgrammingError("execute() first"))
-
-    def _push(self):
-        """store current result"""
+    def __del__(self):
         if self._result is not None:
-            result = self._result
-            self._result = None
-            self._pending_results.append(result)
+            warn(ResourceWarning("unclosed %r" % self))
 
-    def _pop(self):
-        if self._pending_results:
-            self._result = self._pending_results[0]
-            del self._pending_results[0]
-            return True
-        return False
+    def errorhandler(self, error):
+        self.messages.append((type(error), str(error)))
+        raise error
 
-    def _acquire_result(self, connection=None):
-        connection = connection or self._connection()
-        result = connection.get_result(self.use_result)
+    def _check_has_result(self):
+        """Ensure that .execute() has been called."""
+        if self._result is None:
+            self.errorhandler(self.ProgrammingError("there is no result"))
+
+    def _acquire_result(self, connection):
+        result = connection.get_result(self._use_result)
         if result is not None:
             decoders = self.decoders
             self._row_decoders = tuple(get_codec(connection, field, decoders) for field in result.fields)
             self._rowcount = result.num_rows
             self._result = result
+            return True
 
     def _release_result(self):
-        if self._result is not None:
-            result = self._result
-            self._result = None
-            self._rowcount = -1
-            self._row_decoders = ()
-            return result
+        result = self._result
+        self._result = None
+        self._rowcount = -1
+        self._row_decoders = None
+        return result
 
     def _encode(self, connection, obj):
         """
@@ -148,22 +137,36 @@ class CursorBase(object):
 
 
 class Cursor(CursorBase):
-    use_result = False
+    _use_result = False
 
-    def _release_result(self):
-        result = super()._release_result()
-        if result is not None:
-            try:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()
+        return False
+
+    def _free_result(self):
+        result = self._release_result()
+        if result is None:
+            return
+
+        connection = self.connection
+        try:
+            if result.more_rows:
                 while result.fetch_row() is not None:
                     pass
-                result.free()
-            except self.StandardError:
-                pass
+
+            result.free()
+        except self.StandardError as e:
+            warn(connection.Warning(str(e)))
 
     def close(self):
-        while self.nextset():
-            pass
-        self._result = None
+        """close cursor and release resources"""
+        connection = self._connection()
+        if connection:
+            while self.nextset():
+                pass
 
     def warning_check(self):
         """Check for warnings, and report via the warnings module."""
@@ -184,15 +187,11 @@ class Cursor(CursorBase):
         Advance to the next result set.
         Returns False if there are no more result sets.
         """
-        self._release_result()
-        if self._pop():
-            return True
-
+        self._free_result()
         connection = self.connection
         if connection.next_result():
-            self._acquire_result()
-            return True
-        return False
+            if self._acquire_result(connection):
+                return True
 
     def execute(self, query, args=None):
         """
@@ -203,14 +202,15 @@ class Cursor(CursorBase):
                      parameter placeholder in the query. If a mapping is used,
                      %(key)s must be used as the placeholder.
         """
-        connection = self.connection
         try:
+            connection = self.connection
             if isinstance(query, str):
                 query = query.encode(connection.charset)
 
             if args is not None:
                 query = connection.format(query, tuple(get_codec(connection, a, self.encoders)(connection, a) for a in args))
-            self._query(query)
+
+            self._query(connection, query)
 
             if not self._defer_warnings:
                 self.warning_check()
@@ -230,9 +230,10 @@ class Cursor(CursorBase):
         :param query: string, query to execute on server
         :param args: Sequence of sequences or mappings, parameters to use with query.
         """
-        connection = self.connection
         if not args:
             return
+
+        connection = self.connection
 
         if isinstance(query, str):
             query = query.encode(connection.charset)
@@ -253,7 +254,7 @@ class Cursor(CursorBase):
         try:
             sql_params = (connection.format(values, tuple(get_codec(connection, a, self.encoders)(connection, a) for a in row)) for row in args)
             multi_row_query = b'\n'.join([start, b',\n'.join(sql_params), end])
-            self._query(multi_row_query)
+            self._query(connection, multi_row_query)
 
             if not self._defer_warnings:
                 self.warning_check()
@@ -273,23 +274,21 @@ class Cursor(CursorBase):
         :return the original args. (update args for inout parameters additional performance penalty, skip it)
         """
 
-        connection = self.connection
         try:
+            connection = self.connection
             if isinstance(procname, str):
                 procname = procname.encode(connection.charset)
 
             for index, arg in enumerate(args):
                 query = connection.format(b"SET @_%s_%d=%s", (procname, index, self._encode(connection, arg)))
-                self._query(query)
+                self._query(connection, query)
                 self.nextset()
 
             query = connection.format(b"CALL %s(%s)",
-                                            (procname,
-                                             b','.join(connection.format(
-                                                 b'@_%s_%d',
-                                                 (procname, i)) for i in range(len(args)))))
+                                      (procname,
+                                       b','.join(connection.format(b'@_%s_%d', (procname, i)) for i in range(len(args)))))
 
-            self._query(query)
+            self._query(connection, query)
 
             if not self._defer_warnings:
                 self.warning_check()
@@ -302,13 +301,11 @@ class Cursor(CursorBase):
     def __iter__(self):
         return iter(self.fetchone, None)
 
-    def _query(self, query):
+    def _query(self, connection, query):
         """Low-level; executes query, gets result, sets up decoders."""
-        connection = self.connection
-        self._push()
-        self._executed = query
+        self._free_result()
         connection.query(query)
-        self._acquire_result()
+        self._acquire_result(connection)
 
     def fetchone(self):
         """
@@ -316,17 +313,14 @@ class Cursor(CursorBase):
         no more rows are available.
         :return formatted row or None if there is no more rows
         """
-        self._check_executed()
-        if self._result is None:
-            return None
+        self._check_has_result()
         return self.row_formatter(self._row_decoders, self._result.fetch_row())
 
     def fetchmany(self, size=None):
         """Fetch up to size rows from the cursor. Result set may be smaller
         than size. If size is not defined, cursor.arraysize is used."""
-        self._check_executed()
-        if self._result is None:
-            return []
+        self._check_has_result()
+
         if size is None:
             size = self.arraysize
 
@@ -341,9 +335,7 @@ class Cursor(CursorBase):
 
     def fetchall(self):
         """Fetches all available rows from the cursor."""
-        self._check_executed()
-        if self._result is None:
-            return []
+        self._check_has_result()
         return [row for row in self]
 
     def scroll(self, offset, mode='relative'):
@@ -354,7 +346,7 @@ class Cursor(CursorBase):
         value states an absolute target position.
         """
         origin = 0
-        self._check_executed()
+        self._check_has_result()
         if mode == 'relative':
             origin = 1  # SEEK_CUR
         elif mode == 'absolute':
@@ -366,35 +358,41 @@ class Cursor(CursorBase):
 
 
 class CursorAsync(CursorBase):
+    NET_ASYNC_COMPLETE = _websql.constants.NET_ASYNC_COMPLETE
+    _use_result = True
+
     class _NullResult:
         @staticmethod
         def fetch_row_async():
-            return constants.NET_ASYNC_COMPLETE, None
+            return CursorAsync.NET_ASYNC_COMPLETE, None
 
         free_async = fetch_row_async
 
-    use_result = True
+    @property
+    def rowcount(self):
+        # there is no way to get number of rows from async result
+        return -1
 
     @asyncio.coroutine
-    def _release_result(self):
+    def _free_result(self):
         result = super()._release_result()
         if result is not None:
-            result = self._result
             connection = self.connection
-            self._result = None
             try:
-                while (yield from connection.promise(result.fetch_row_async)) is not None:
-                    pass
+                if result.more_rows:
+                    while (yield from connection.promise(result.fetch_row_async)) is not None:
+                        pass
 
                 yield from connection.promise(result.free_async)
-            except self.StandardError:
-                pass
+            except self.StandardError as e:
+                warn(connection.Warning(str(e)))
 
     @asyncio.coroutine
     def close(self):
-        while (yield from self.nextset()):
-            pass
-        self._result = None
+        connection = self._connection()
+        if connection:
+            while (yield from self.nextset()):
+                pass
 
     @asyncio.coroutine
     def warning_check(self):
@@ -417,15 +415,11 @@ class CursorAsync(CursorBase):
         Advance to the next result set.
         Returns False if there are no more result sets.
         """
-        yield from self._release_result()
-        if self._pop():
-            return True
-
+        yield from self._free_result()
         connection = self.connection
         if (yield from connection.next_result()):
-            self._acquire_result()
-            return True
-        return False
+            if self._acquire_result(connection):
+                return True
 
     @asyncio.coroutine
     def execute(self, query, args=None):
@@ -437,15 +431,16 @@ class CursorAsync(CursorBase):
                      parameter placeholder in the query. If a mapping is used,
                      %(key)s must be used as the placeholder.
         """
-        connection = self.connection
+
         try:
+            connection = self.connection
             if isinstance(query, str):
                 query = query.encode(connection.charset)
 
             if args is not None:
                 query = connection.format(query, tuple(get_codec(connection, a, self.encoders)(connection, a) for a in args))
 
-            yield from self._query(query)
+            yield from self._query(connection, query)
 
             if not self._defer_warnings:
                 yield from self.warning_check()
@@ -465,9 +460,10 @@ class CursorAsync(CursorBase):
         :param query: string, query to execute on server
         :param args: Sequence of sequences or mappings, parameters to use with query.
         """
-        connection = self.connection
         if not args:
             return
+
+        connection = self.connection
 
         if isinstance(query, str):
             query = query.encode(connection.charset)
@@ -485,7 +481,7 @@ class CursorAsync(CursorBase):
         try:
             sql_params = (connection.format(values, tuple(get_codec(connection, a, self.encoders)(connection, a) for a in row)) for row in args)
             multi_row_query = b'\n'.join([start, b',\n'.join(sql_params), end])
-            yield from self._query(multi_row_query)
+            yield from self._query(connection, multi_row_query)
 
             if not self._defer_warnings:
                 yield from self.warning_check()
@@ -494,6 +490,7 @@ class CursorAsync(CursorBase):
         except Exception as e:
             self.errorhandler(e)
 
+    @asyncio.coroutine
     def callproc(self, procname, args=()):
         """
         Execute stored procedure procname with args
@@ -504,24 +501,24 @@ class CursorAsync(CursorBase):
         :return the original args. (update args for inout parameters additional performance penalty, skip it)
         """
 
-        connection = self.connection
         try:
+            connection = self.connection
+
             if isinstance(procname, str):
                 procname = procname.encode(connection.charset)
 
             for index, arg in enumerate(args):
                 query = connection.format(b"SET @_%s_%d=%s", (procname, index, self._encode(connection, arg)))
-                yield from self._query(query)
+                yield from self._query(connection, query)
                 yield from self.nextset()
 
-            query = connection.format(b"CALL %s(%s)", (procname,
-                                                             b','.join(connection.format(
-                                                                 b'@_%s_%d',
-                                                                 ((procname, i) for i in range(len(args)))))))
-            yield from self._query(query)
+            query = connection.format(b"CALL %s(%s)",
+                                      (procname,
+                                       b','.join(connection.format(b'@_%s_%d', (procname, i)) for i in range(len(args)))))
+
+            yield from self._query(connection, query)
             if not self._defer_warnings:
                 yield from self.warning_check()
-
             return args
         except TypeError as e:
             self.errorhandler(self.ProgrammingError(e))
@@ -529,13 +526,11 @@ class CursorAsync(CursorBase):
             self.errorhandler(e)
 
     @asyncio.coroutine
-    def _query(self, query):
+    def _query(self, connection, query):
         """Low-level; executes query, gets result, sets up decoders."""
-        connection = self.connection
-        self._push()
-        self._executed = query
+        yield from self._free_result()
         yield from connection.query(query)
-        self._acquire_result()
+        self._acquire_result(connection)
 
     @asyncio.coroutine
     def fetchone(self):
@@ -544,22 +539,17 @@ class CursorAsync(CursorBase):
         no more rows are available.
         :return formatted row or None if there is no more rows
         """
-        self._check_executed()
-        if self._result is None:
-            return None
+        self._check_has_result()
+
         connection = self.connection
-        row = yield from connection.promise(self._result.fetch_row_async)
-        if row is None:
-            return row
-        return self.row_formatter(self._row_decoders, row)
+        return self.row_formatter(self._row_decoders, (yield from connection.promise(self._result.fetch_row_async)))
 
     @asyncio.coroutine
     def fetchmany(self, size=None):
         """Fetch up to size rows from the cursor. Result set may be smaller
         than size. If size is not defined, cursor.arraysize is used."""
-        self._check_executed()
-        if self._result is None:
-            return []
+        self._check_has_result()
+
         if size is None:
             size = self.arraysize
 
@@ -575,11 +565,9 @@ class CursorAsync(CursorBase):
     @asyncio.coroutine
     def fetchall(self):
         """Fetches all available rows from the cursor."""
-        rows = []
-        self._check_executed()
-        if self._result is None:
-            return rows
+        self._check_has_result()
 
+        rows = []
         append = rows.append
         while True:
             row = yield from self.fetchone()

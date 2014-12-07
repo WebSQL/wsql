@@ -1,20 +1,19 @@
 """
-MySQLdb type conversion module
+WebSQL type conversion module
 ------------------------------
-
-
-
 """
-
-from _websql import constants
 
 from decimal import Decimal
 from math import modf
 import datetime
 import struct
+import _websql
 
 
-NULL = constants.NULL
+NULL = _websql.constants.NULL
+
+_FLAG_BINARY = _websql.constants.FLAG_BINARY
+_FLAG_SET = _websql.constants.FLAG_SET
 
 
 def bool_to_sql(_, value):
@@ -24,7 +23,7 @@ def bool_to_sql(_, value):
 
 def set_to_sql(connection, value):
     """Convert a Python set to an SQL literal."""
-    return connection.string_literal(','.join(value)).decode(connection.charset)
+    return connection.quote(','.join(value)).decode(connection.charset)
 
 
 def sql_to_set(value):
@@ -173,32 +172,32 @@ simple_type_encoders = {
 # character sets, etc.). This should always be used as the last
 # resort.
 simple_field_decoders = {
-    constants.FIELD_TYPE_TINY_BLOB: bytes_or_None_if_NULL,
-    constants.FIELD_TYPE_MEDIUM_BLOB: bytes_or_None_if_NULL,
-    constants.FIELD_TYPE_LONG_BLOB: bytes_or_None_if_NULL,
+    _websql.constants.FIELD_TYPE_TINY_BLOB: bytes_or_None_if_NULL,
+    _websql.constants.FIELD_TYPE_MEDIUM_BLOB: bytes_or_None_if_NULL,
+    _websql.constants.FIELD_TYPE_LONG_BLOB: bytes_or_None_if_NULL,
 
-    constants.FIELD_TYPE_TINY: int_or_None_if_NULL,
-    constants.FIELD_TYPE_SHORT: int_or_None_if_NULL,
-    constants.FIELD_TYPE_LONG: int_or_None_if_NULL,
-    constants.FIELD_TYPE_INT24: int_or_None_if_NULL,
-    constants.FIELD_TYPE_LONGLONG: int_or_None_if_NULL,
+    _websql.constants.FIELD_TYPE_TINY: int_or_None_if_NULL,
+    _websql.constants.FIELD_TYPE_SHORT: int_or_None_if_NULL,
+    _websql.constants.FIELD_TYPE_LONG: int_or_None_if_NULL,
+    _websql.constants.FIELD_TYPE_INT24: int_or_None_if_NULL,
+    _websql.constants.FIELD_TYPE_LONGLONG: int_or_None_if_NULL,
 
-    constants.FIELD_TYPE_FLOAT: float_or_None_if_NULL,
-    constants.FIELD_TYPE_DOUBLE: float_or_None_if_NULL,
+    _websql.constants.FIELD_TYPE_FLOAT: float_or_None_if_NULL,
+    _websql.constants.FIELD_TYPE_DOUBLE: float_or_None_if_NULL,
 
-    constants.FIELD_TYPE_DECIMAL: decimal_or_None_if_NULL,
-    constants.FIELD_TYPE_NEWDECIMAL: decimal_or_None_if_NULL,
+    _websql.constants.FIELD_TYPE_DECIMAL: decimal_or_None_if_NULL,
+    _websql.constants.FIELD_TYPE_NEWDECIMAL: decimal_or_None_if_NULL,
 
-    constants.FIELD_TYPE_YEAR: int_or_None_if_NULL,
+    _websql.constants.FIELD_TYPE_YEAR: int_or_None_if_NULL,
 
-    constants.FIELD_TYPE_TIMESTAMP: datetime_or_None_if_NULL,
-    constants.FIELD_TYPE_DATETIME: datetime_or_None_if_NULL,
-    constants.FIELD_TYPE_DATE: date_or_None_if_NULL,
-    constants.FIELD_TYPE_NEWDATE: date_or_None_if_NULL,
-    constants.FIELD_TYPE_TIME: timedelta_or_None_if_NULL,
+    _websql.constants.FIELD_TYPE_TIMESTAMP: datetime_or_None_if_NULL,
+    _websql.constants.FIELD_TYPE_DATETIME: datetime_or_None_if_NULL,
+    _websql.constants.FIELD_TYPE_DATE: date_or_None_if_NULL,
+    _websql.constants.FIELD_TYPE_NEWDATE: date_or_None_if_NULL,
+    _websql.constants.FIELD_TYPE_TIME: timedelta_or_None_if_NULL,
 
-    constants.FIELD_TYPE_BIT: bit_or_None_if_NULL,
-    constants.FIELD_TYPE_SET: set_or_None_if_NULL
+    _websql.constants.FIELD_TYPE_BIT: bit_or_None_if_NULL,
+    _websql.constants.FIELD_TYPE_SET: set_or_None_if_NULL
 }
 
 # Decoder protocol
@@ -238,10 +237,10 @@ def simple_encoder(_, value):
 
 
 character_types = {
-    constants.FIELD_TYPE_BLOB,
-    constants.FIELD_TYPE_STRING,
-    constants.FIELD_TYPE_VAR_STRING,
-    constants.FIELD_TYPE_VARCHAR,
+    _websql.constants.FIELD_TYPE_BLOB,
+    _websql.constants.FIELD_TYPE_STRING,
+    _websql.constants.FIELD_TYPE_VAR_STRING,
+    _websql.constants.FIELD_TYPE_VARCHAR,
 }
 
 
@@ -249,10 +248,10 @@ def character_decoder(connection, field):
     if field.type not in character_types:
         return None
 
-    if field.flags & constants.FLAG_BINARY:
+    if field.flags & _FLAG_BINARY:
         return bytes_or_None_if_NULL
 
-    if field.flags & constants.FLAG_SET:
+    if field.flags & _FLAG_SET:
         return set_or_None_if_NULL
 
     charset = connection.charset

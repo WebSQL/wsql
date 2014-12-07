@@ -42,6 +42,7 @@ typedef struct {
     MYSQL_RES *result;
     int num_fields;
     int use;
+    int more_rows;
     PyObject *fields;
 } _mysql_result_object;
 

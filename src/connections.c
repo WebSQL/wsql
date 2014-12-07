@@ -440,6 +440,7 @@ _mysql_connection_object_next_result(
     Py_END_ALLOW_THREADS
     if (error > 0)
         return _mysql_exception(self);
+
     return PyBool_FromLong(!error);
 }
 
@@ -863,6 +864,7 @@ _mysql_connection_object_query(
     if (!PyArg_ParseTuple(args, "s#:query", &query, &query_size))
         return NULL;
     CHECK_CONNECTION(self, NULL);
+
     Py_BEGIN_ALLOW_THREADS
     error = mysql_real_query(&(self->connection), query, query_size);
     Py_END_ALLOW_THREADS
@@ -1065,9 +1067,9 @@ _mysql_connection_object_query_async(
     status = mysql_real_query_nonblocking(&(self->connection), query, query_size, &error);
 
     if (status == NET_ASYNC_COMPLETE && error) {
-        TRACE2("%p, %d", self, error);
         return _mysql_exception(self);
     }
+
     return Py_BuildValue("(iO)", (int)status, Py_None);
 }
 
@@ -1088,7 +1090,6 @@ _mysql_connection_object_next_result_async(
     CHECK_CONNECTION(self, NULL);
     status = mysql_next_result_nonblocking(&(self->connection), &error);
     if (status == NET_ASYNC_COMPLETE && error > 0) {
-        TRACE2("%p, %d", self, error);
         return _mysql_exception(self);
     }
     return Py_BuildValue("(iO)", (int)status, PyBool_FromLong(!error));
@@ -1313,7 +1314,7 @@ static PyMethodDef _mysql_connection_object_methods[] = {
     {NULL} /* sentinel */
 };
 
-static struct PyMemberDef _mysql_connection_object_members[] = {
+static PyMemberDef _mysql_connection_object_members[] = {
     {
         "open",
         T_INT,
@@ -1338,15 +1339,15 @@ static struct PyMemberDef _mysql_connection_object_members[] = {
     {
          "client_flag",
          T_UINT,
-         READONLY,
          offsetof(_mysql_connection_object, connection.client_flag),
+         READONLY,
          "Client flags; refer to MySQLdb.constants.CLIENT"
     },
     {NULL} /* Sentinel */
 };
 
 
-static struct PyGetSetDef _mysql_connection_object_getset[]  = {
+static PyGetSetDef _mysql_connection_object_getset[]  = {
     {
         "autocommit",
         (getter)_mysql_connection_object_get_autocommit,
