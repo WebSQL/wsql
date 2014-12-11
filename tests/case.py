@@ -15,8 +15,13 @@ class DatabaseTestCase(TestCase):
         raise NotImplementedError
 
     @classmethod
+    def _setup_cls(cls):
+        pass
+
+    @classmethod
     def setUpClass(cls):
         cls._context = cls.get_context()
+        cls._setup_cls()
 
     @classmethod
     def tearDownClass(cls):

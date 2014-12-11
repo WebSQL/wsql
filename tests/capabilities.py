@@ -18,11 +18,9 @@ class CapabilityTestCases(DatabaseTestCase):
         raise NotImplementedError
 
     @classmethod
-    def setUpClass(cls):
-        if issubclass(cls, DatabaseTestCase):
-            super(cls).setUpClass()
-            cls.BLOBText = ''.join([chr(i) for i in range(256)] * 100)
-            cls.BLOBBinary = bytes(range(256)) * 16
+    def _setup_cls(cls):
+        cls.BLOBText = ''.join([chr(i) for i in range(256)] * 100)
+        cls.BLOBBinary = bytes(range(256)) * 16
 
     def _create_table(self, columns, generator):
         """ Create a table using a list of column definitions given in columns.

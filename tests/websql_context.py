@@ -1,10 +1,13 @@
 __author__ = "@bg"
 
 from websql.cursors import INSERT_VALUES
-import asyncio
+from os import getenv
 import _websql
-import websql
+import asyncio
 import warnings
+import weakref
+import websql
+
 
 warnings.filterwarnings('error')
 
@@ -16,8 +19,11 @@ class WebSQLContextBase:
     errors = _websql.exceptions
     constants = _websql.constants
 
-    connect_kwargs = {"database": 'test', "read_default_file": "my.cnf", "read_default_group": "websql",
-                      "user": "root", "charset": "utf8", "sql_mode": "ANSI,STRICT_TRANS_TABLES,TRADITIONAL"}
+    connect_kwargs = {"database": getenv('WEBSQL_TEST_DATABASE', 'test'),
+                      "user": getenv('WEBSQL_TEST_USER', 'root'),
+                      "password": getenv('WEBSQL_TEST_PASSWORD', ''),
+                      "charset": "utf8",
+                      "sql_mode": "ANSI,STRICT_TRANS_TABLES,TRADITIONAL"}
 
     create_table_extra = "ENGINE=INNODB CHARACTER SET UTF8"
     rows = 10
@@ -82,11 +88,13 @@ class WebSQLAsyncContext(WebSQLContextBase):
             return wrapper
 
     def __init__(self):
-        self.loop = asyncio.get_event_loop()
+        self.loop = asyncio.new_event_loop()
+        self._quard = weakref.finalize(self, lambda x: (x.stop(), x.close()), self.loop)
+
         super().__init__()
 
     def make_connection(self):
-        return self.unref(websql.connect(nonblocking=True, **self.connect_kwargs))
+        return self.unref(websql.connect(nonblocking=True, loop=self.loop, **self.connect_kwargs))
 
     def setup(self):
         self._cursor = self._connection.cursor()
@@ -97,8 +105,6 @@ class WebSQLAsyncContext(WebSQLContextBase):
 
     def clean(self):
         self._connection.close()
-        self.loop.stop()
-        self.loop.close()
 
     def connection(self):
         return self.WrapObject(self._connection, self)
