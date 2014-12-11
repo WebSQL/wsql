@@ -8,10 +8,10 @@ from distutils import log
 
 class BuildWebSQL(_build_ext):
     def run(self):
-        path = os.path.abspath('websql')
+        path = os.path.abspath('extra/mysql')
         log.info("building 'websqlclient' library")
         pwd = os.getcwd()
-        temp_dir = os.path.join(self.build_temp, 'websql')
+        temp_dir = os.path.join(self.build_temp, 'websqlclient')
         self.mkpath(temp_dir)
         os.chdir(temp_dir)
         try:
@@ -20,7 +20,7 @@ class BuildWebSQL(_build_ext):
         finally:
             os.chdir(pwd)
 
-        self.include_dirs.extend([os.path.join(temp_dir, 'include'), 'websql/include'])
+        self.include_dirs.extend([os.path.join(temp_dir, 'include'), 'extra/mysql/include'])
         self.libraries.append('websqlclient')
         self.library_dirs.append(os.path.join(temp_dir, 'libmysql'))
 
@@ -58,9 +58,11 @@ class BuildWebSQL(_build_ext):
                 py_errors.write(b"}\n")
 
 
-MODULE_NAME = "_websql"
+__name__ = "websql"
+__version__ = "1.1.0"
 
-module1 = Extension(MODULE_NAME,
+
+module1 = Extension('_' + __name__,
                     sources=["./src/connections.c",
                              "./src/constants.c",
                              "./src/exceptions.c",
@@ -72,19 +74,75 @@ module1 = Extension(MODULE_NAME,
                     extra_compile_args=["-Os", "-g", "-fno-strict-aliasing"],
                     define_macros=[
                         ("HAVE_ASYNCIO", 1),
-                        ("MODULE_NAME", MODULE_NAME),
-                        ("version_info", "(2, 1, 0, 'beta', 0)"),
-                        ("__version__", "2.1.0")
+                        ("MODULE_NAME", '_' + __name__),
+                        ("version_info", "(%s, 'beta', 0)" % __version__),
+                        ("__version__", __version__)
                     ])
 
 setup(
+    name=__name__,
+    version=__version__,
+    description='Asynchronous Python interface to MySQL',
+    cmdclass={'build_ext': BuildWebSQL},
     ext_modules=[module1],
     py_modules=[
-        "MySQLdb._types",
-        "MySQLdb.connections",
-        "MySQLdb.converters",
-        "MySQLdb.cursors",
-        "MySQLdb.release",
-        "MySQLdb.times"
+        "websql._types",
+        "websql.connections",
+        "websql.converters",
+        "websql.cursors",
+        "websql.release",
+        "websql.times"
     ],
-    cmdclass={'build_ext': BuildWebSQL})
+    author="@bg",
+    author_email='gaifullinbf@gmail.com',
+    maintainer='@bg',
+    maintainer_email='gaifullinbf@gmail.com',
+    url='https://github.com/bgaifullin/web-sql',
+    license='GPL',
+    install_requires=["openssl-devel", "zlib-devel"],
+    requires=["openssl", "zlib"],
+    long_description="""\
+=========================
+Asynchronous Python interface for MySQL
+=========================
+\n
+MySQLdb is an asynchronous interface to the popular MySQL_ database server for
+Python.  The design goals are:
+\n
+- Compatibility with Python3 asyncio package
+\n
+- Compatibility with WebScale fork of MySQL
+\n
+- Compliance with Python database API version 2.0 [PEP-0249]_
+\n
+- Thread-safety
+\n
+- Thread-friendliness (threads will not block each other)
+\n
+MySQL-3.23 through 5.1 and Python-2.3 through 2.5 are currently
+supported.
+\n
+MySQLdb is `Free Software`_.
+\n
+.. _MySQL: http://www.mysql.com/
+.. _`Free Software`: http://www.gnu.org/
+.. [PEP-0249] http://www.python.org/peps/pep-0249.html
+      """,
+    classifiers=[
+        "Development Status :: 5 - Beta",
+        "Environment :: Other Environment",
+        "License :: OSI Approved :: GNU General Public License (GPL)",
+        "Operating System :: MacOS :: MacOS X",
+        "Operating System :: OS Independent",
+        "Operating System :: POSIX",
+        "Operating System :: POSIX :: Linux",
+        "Operating System :: Unix",
+        "Programming Language :: C",
+        "Programming Language :: Python3",
+        "Topic :: Database",
+        "Topic :: Database :: Database Engines/Servers",
+    ]
+)
+
+# to build debug
+# CFLAGS='-Wall -O0 -g' python3 setup.py build

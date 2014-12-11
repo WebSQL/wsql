@@ -1,5 +1,5 @@
 ====================
-MySQLdb User's Guide
+websql User's Guide
 ====================
 
 .. contents::
@@ -8,7 +8,7 @@ MySQLdb User's Guide
 Introduction
 ------------
 
-MySQLdb is an thread-compatible interface to the popular MySQL
+websql is an thread-compatible interface to the popular MySQL
 database server that provides the Python database API.
 
 Installation
@@ -17,7 +17,7 @@ Installation
 The ``README`` file has complete installation instructions.
 
 
-_mysql
+_websql
 ------
 
 If you want to write applications which are portable across databases,

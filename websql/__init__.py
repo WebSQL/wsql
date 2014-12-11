@@ -16,11 +16,10 @@ For information on how MySQLdb handles type conversion, see the
 MySQLdb.converters module.
 """
 
-from .release import __version__, version_info, __author__
 from .connections import *
 from .times import *
 from ._types import *
-from mysql.connector import cursor
+
 
 __all__ = [
     'connect', 'apilevel', 'threadsafety', 'paramstyle',

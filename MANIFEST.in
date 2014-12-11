@@ -5,7 +5,3 @@ include ChangeLog
 include HISTORY
 include GPL
 recursive-include tests *.py
-include metadata.cfg
-include site.cfg
-include setup_*.py
-include ez_setup.py
