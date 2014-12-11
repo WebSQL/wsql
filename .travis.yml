@@ -1,0 +1,15 @@
+language: python
+python:
+  - "3.4"
+
+env:
+ - WEBSQL_TEST_DATABASE=websql_test WEBSQL_TEST_USER=root
+
+install:
+  - python setup.py install
+
+before_script:
+  - mysql -e 'create database websql_test';
+
+script:
+ - python python3 -m unittest discover --start-directory tests
