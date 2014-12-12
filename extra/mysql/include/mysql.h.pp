@@ -1,5 +1,3 @@
-typedef char my_bool;
-typedef int my_socket;
 #include "mysql_version.h"
 #include "mysql_com.h"
 enum enum_server_command
@@ -258,6 +256,8 @@ extern LIST *list_reverse(LIST *root);
 extern void list_free(LIST *root,unsigned int free_data);
 extern unsigned int list_length(LIST *);
 extern int list_walk(LIST *,list_walk_action action,unsigned char * argument);
+typedef char my_bool;
+typedef int my_socket;
 extern unsigned int mysql_port;
 extern char *mysql_unix_port;
 typedef struct st_mysql_field {
@@ -580,19 +580,19 @@ int mysql_real_query(MYSQL *mysql, const char *q,
 MYSQL_RES * mysql_store_result(MYSQL *mysql);
 MYSQL_RES * mysql_use_result(MYSQL *mysql);
 my_bool mysql_real_connect_nonblocking_init(MYSQL *mysql,
-                                                            const char *host,
-                                                            const char *user,
-                                                            const char *passwd,
-                                                            const char *db,
-                                                            unsigned int port,
-                                                            const char *unix_socket,
-                                                            unsigned long clientflag);
+           const char *host,
+           const char *user,
+           const char *passwd,
+           const char *db,
+           unsigned int port,
+           const char *unix_socket,
+           unsigned long clientflag);
 net_async_status mysql_real_connect_nonblocking_run(MYSQL *mysql,
                                                             int *error);
 net_async_status
-mysql_send_query_nonblocking(MYSQL* mysql, const char* query, int *error);
+mysql_send_query_nonblocking(MYSQL *mysql, const char *query, int *error);
 net_async_status
-mysql_real_query_nonblocking(MYSQL *mysql, const char* query,
+mysql_real_query_nonblocking(MYSQL *mysql, const char *query,
                              unsigned long length, int *error);
 net_async_status
 mysql_next_result_nonblocking(MYSQL *mysql, int* error);
@@ -649,7 +649,7 @@ MYSQL_FIELD_OFFSET mysql_field_seek(MYSQL_RES *result,
         MYSQL_FIELD_OFFSET offset);
 MYSQL_ROW mysql_fetch_row(MYSQL_RES *result);
 net_async_status mysql_fetch_row_nonblocking(MYSQL_RES *res,
-                                                     MYSQL_ROW* row);
+           MYSQL_ROW* row);
 unsigned long * mysql_fetch_lengths(MYSQL_RES *result);
 MYSQL_FIELD * mysql_fetch_field(MYSQL_RES *result);
 MYSQL_RES * mysql_list_fields(MYSQL *mysql, const char *table,

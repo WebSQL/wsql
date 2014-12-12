@@ -19,8 +19,10 @@
 
 #ifndef _mysql_com_h
 #define _mysql_com_h
+#ifndef MYSQL_ABI_CHECK
 #include "my_global.h"
 #include "mysql_version.h"
+#endif
 
 #define HOSTNAME_LENGTH 60
 #define SYSTEM_CHARSET_MBMAXLEN 3
