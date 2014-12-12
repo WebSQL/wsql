@@ -46,6 +46,7 @@ _mysql_format_write_char(struct _mysql_formatter_t* ctx, char c) {
 static int
 _mysql_format_write_object(struct _mysql_formatter_t* ctx, PyObject* o) {
     PyObject* bytes = NULL;
+    Py_ssize_t i;
 
     if (PyLong_Check(o)) {
         o = PyNumber_ToBase(o, 10);
@@ -79,7 +80,7 @@ _mysql_format_write_object(struct _mysql_formatter_t* ctx, PyObject* o) {
 
     char* data = PyBytes_AS_STRING(bytes);
 
-    for (Py_ssize_t i = 0; i < len; ++i, ++ctx->out_pos)
+    for (i = 0; i < len; ++i, ++ctx->out_pos)
         ctx->out_data[ctx->out_pos] = data[i];
 
     Py_DECREF(bytes);

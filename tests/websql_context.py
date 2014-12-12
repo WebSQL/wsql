@@ -19,13 +19,14 @@ class WebSQLContextBase:
     errors = _websql.exceptions
     constants = _websql.constants
 
-    connect_kwargs = {"database": getenv('WEBSQL_TEST_DATABASE', 'test'),
+    connect_kwargs = {"host": getenv('WEBSQL_TEST_HOST', '127.0.0.1'),
+                      "database": getenv('WEBSQL_TEST_DATABASE', 'test'),
                       "user": getenv('WEBSQL_TEST_USER', 'root'),
                       "password": getenv('WEBSQL_TEST_PASSWORD', ''),
                       "charset": "utf8",
                       "sql_mode": "ANSI,STRICT_TRANS_TABLES,TRADITIONAL"}
 
-    create_table_extra = "ENGINE=INNODB CHARACTER SET UTF8"
+    create_table_extra = "ENGINE=INNODB CHARACTER SET UTF8 COLLATE utf8_unicode_ci"
     rows = 10
     debug = False
     leak_test = False

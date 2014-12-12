@@ -72,9 +72,10 @@ module1 = Extension('_' + __name__,
                              "./src/results.c"],
                     libraries=['ssl', 'crypto'],
                     extra_compile_args=["-Os", "-g", "-fno-strict-aliasing", "-std=c99"],
+                    extra_link_args=["-lstdc++"],
                     define_macros=[
                         ("MODULE_NAME", '_' + __name__),
-                        ("version_info", "(%s, 'beta', 0)" % __version__),
+                        ("version_info", "(%d, %d, %d, 'beta', 0)" % tuple(map(int, __version__.split('.')))),
                         ("__version__", __version__)
                     ])
 
