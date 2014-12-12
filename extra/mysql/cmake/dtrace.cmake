@@ -75,19 +75,33 @@ ENDMACRO()
 
 # Create provider headers
 IF(ENABLE_DTRACE)
-  CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/include/probes_mysql.d.base 
+  CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/include/probes_mysql.d.base
     ${CMAKE_BINARY_DIR}/include/probes_mysql.d COPYONLY)
   DTRACE_HEADER(
-   ${CMAKE_BINARY_DIR}/include/probes_mysql.d 
+   ${CMAKE_BINARY_DIR}/include/probes_mysql.d
    ${CMAKE_BINARY_DIR}/include/probes_mysql_dtrace.h
    ${CMAKE_BINARY_DIR}/include/probes_mysql_nodtrace.h
   )
   ADD_CUSTOM_TARGET(gen_dtrace_header
-  DEPENDS  
+  DEPENDS
   ${CMAKE_BINARY_DIR}/include/probes_mysql.d
   ${CMAKE_BINARY_DIR}/include/probes_mysql_dtrace.h
   ${CMAKE_BINARY_DIR}/include/probes_mysql_nodtrace.h
-  ) 
+  )
+ELSE()
+  CONFIGURE_FILE(${CMAKE_SOURCE_DIR}/include/probes_mysql.d.base
+    ${CMAKE_BINARY_DIR}/include/probes_mysql.d COPYONLY)
+
+  ADD_CUSTOM_COMMAND(
+   OUTPUT  ${CMAKE_BINARY_DIR}/include/probes_mysql_nodtrace.h
+   COMMAND perl ${CMAKE_SOURCE_DIR}/scripts/dheadgen.pl ${CMAKE_BINARY_DIR}/include/probes_mysql.d > ${CMAKE_BINARY_DIR}/include/probes_mysql_nodtrace.h
+   DEPENDS ${CMAKE_BINARY_DIR}/include/probes_mysql.d
+ )
+ ADD_CUSTOM_TARGET(gen_dtrace_header
+  DEPENDS
+  ${CMAKE_BINARY_DIR}/include/probes_mysql.d
+  ${CMAKE_BINARY_DIR}/include/probes_mysql_nodtrace.h
+ )
 ENDIF()
 
 FUNCTION(DTRACE_INSTRUMENT target)
@@ -97,9 +111,10 @@ FUNCTION(DTRACE_INSTRUMENT target)
       RETURN()
     ENDIF()
   ENDIF()
-  IF(ENABLE_DTRACE)
-    ADD_DEPENDENCIES(${target} gen_dtrace_header)
 
+  ADD_DEPENDENCIES(${target} gen_dtrace_header)
+
+  IF(ENABLE_DTRACE)
     # Invoke dtrace to generate object file and link it together with target.
     IF(HAVE_REAL_DTRACE_INSTRUMENTING)
       SET(objdir ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${target}.dir)
