@@ -15,7 +15,7 @@ class BuildWebSQL(_build_ext):
         self.mkpath(temp_dir)
         os.chdir(temp_dir)
         try:
-            self.spawn(['cmake', path, '-DDISABLE_SHARED=on'])
+            self.spawn(['cmake', path, '-DDISABLE_SHARED=on', '-DWITH_PIC=1'])
             self.spawn(['make'])
         finally:
             os.chdir(pwd)
@@ -71,9 +71,8 @@ module1 = Extension('_' + __name__,
                              "./src/mysqlmod.c",
                              "./src/results.c"],
                     libraries=['ssl', 'crypto'],
-                    extra_compile_args=["-Os", "-g", "-fno-strict-aliasing"],
+                    extra_compile_args=["-Os", "-g", "-fno-strict-aliasing", "-std=c99"],
                     define_macros=[
-                        ("HAVE_ASYNCIO", 1),
                         ("MODULE_NAME", '_' + __name__),
                         ("version_info", "(%s, 'beta', 0)" % __version__),
                         ("__version__", __version__)
@@ -99,8 +98,6 @@ setup(
     maintainer_email='gaifullinbf@gmail.com',
     url='https://github.com/bgaifullin/web-sql',
     license='GPL',
-    install_requires=["openssl-devel", "zlib-devel"],
-    requires=["openssl", "zlib"],
     long_description="""\
 =========================
 Asynchronous Python interface for MySQL

@@ -27,6 +27,11 @@ typedef int Py_ssize_t;
 #define PY_SSIZE_T_MIN INT_MIN
 #endif
 
+
+#ifdef HAVE_MYSQL_NONBLOCKING_CLIENT
+#define HAVE_ASYNCIO
+#endif
+
 typedef struct {
     PyObject_HEAD
     MYSQL connection;

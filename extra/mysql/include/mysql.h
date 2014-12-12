@@ -541,9 +541,9 @@ my_bool		STDCALL mysql_real_connect_nonblocking_init(MYSQL *mysql,
 net_async_status STDCALL mysql_real_connect_nonblocking_run(MYSQL *mysql,
                                                             int *error);
 net_async_status STDCALL
-mysql_send_query_nonblocking(MYSQL* mysql, const char* query, int *error);
+mysql_send_query_nonblocking(MYSQL *mysql, const char *query, int *error);
 net_async_status STDCALL
-mysql_real_query_nonblocking(MYSQL *mysql, const char* query,
+mysql_real_query_nonblocking(MYSQL *mysql, const char *query,
                              unsigned long length, int *error);
 net_async_status STDCALL
 mysql_next_result_nonblocking(MYSQL *mysql, int* error);

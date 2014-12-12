@@ -76,13 +76,13 @@
 #define IF_WIN(A,B) A
 #else
 #define IF_WIN(A,B) B
-#endif
+#endif /* __WIN__ */
 
 #ifdef HAVE_purify
 #define IF_PURIFY(A,B) A
 #else
 #define IF_PURIFY(A,B) B
-#endif
+#endif /* HAVE_purify */
 
 #ifndef EMBEDDED_LIBRARY
 #ifdef WITH_NDB_BINLOG
@@ -149,29 +149,29 @@
   MySQL and MySQL applications under darwin. 
 */
 #if defined(__APPLE__) && defined(__MACH__)
-#  undef SIZEOF_CHARP 
-#  undef SIZEOF_SHORT 
-#  undef SIZEOF_INT 
-#  undef SIZEOF_LONG 
-#  undef SIZEOF_LONG_LONG 
-#  undef SIZEOF_OFF_T 
-#  undef WORDS_BIGENDIAN
-#  define SIZEOF_SHORT 2
-#  define SIZEOF_INT 4
-#  define SIZEOF_LONG_LONG 8
-#  define SIZEOF_OFF_T 8
-#  if defined(__i386__) || defined(__ppc__)
-#    define SIZEOF_CHARP 4
-#    define SIZEOF_LONG 4
-#  elif defined(__x86_64__) || defined(__ppc64__)
-#    define SIZEOF_CHARP 8
-#    define SIZEOF_LONG 8
-#  else
-#    error Building FAT binary for an unknown architecture.
-#  endif
-#  if defined(__ppc__) || defined(__ppc64__)
-#    define WORDS_BIGENDIAN
-#  endif
+#undef SIZEOF_CHARP
+#undef SIZEOF_SHORT
+#undef SIZEOF_INT
+#undef SIZEOF_LONG
+#undef SIZEOF_LONG_LONG
+#undef SIZEOF_OFF_T
+#undef WORDS_BIGENDIAN
+#define SIZEOF_SHORT 2
+#define SIZEOF_INT 4
+#define SIZEOF_LONG_LONG 8
+#define SIZEOF_OFF_T 8
+#if defined(__i386__) || defined(__ppc__)
+#define SIZEOF_CHARP 4
+#define SIZEOF_LONG 4
+#elif defined(__x86_64__) || defined(__ppc64__)
+#define SIZEOF_CHARP 8
+#define SIZEOF_LONG 8
+#else
+#error Building FAT binary for an unknown architecture.
+#endif /* defined(__i386__) || defined(__ppc__) */
+#if defined(__ppc__) || defined(__ppc64__)
+#define WORDS_BIGENDIAN
+#endif
 #endif /* defined(__APPLE__) && defined(__MACH__) */
 
 
@@ -211,6 +211,7 @@
 #endif
 
 #define __EXTENSIONS__ 1	/* We want some extension */
+
 #ifndef __STDC_EXT__
 #define __STDC_EXT__ 1          /* To get large file support on hpux */
 #endif
@@ -244,8 +245,8 @@
 #define _XOPEN_SOURCE 600
 #else
 #define _XOPEN_SOURCE 500
-#endif
-#endif
+#endif /* __STDC_VERSION__ - 0 >= 199901L */
+#endif //__sun
 
 #if !defined(__WIN__)
 #ifndef _POSIX_PTHREAD_SEMANTICS
@@ -255,19 +256,23 @@
 #if !defined(SCO)
 #define _REENTRANT	1	/* Some thread libraries require this */
 #endif
+
 #if !defined(_THREAD_SAFE) && !defined(_AIX)
 #define _THREAD_SAFE            /* Required for OSF1 */
 #endif
+
 #if defined(HPUX10) || defined(HPUX11)
 C_MODE_START			/* HPUX needs this, signal.h bug */
 #include <pthread.h>
 C_MODE_END
 #else
 #include <pthread.h>		/* AIX must have this included first */
-#endif
+#endif /* HPUX10 || HPUX11 */
+
 #if !defined(SCO) && !defined(_REENTRANT)
 #define _REENTRANT	1	/* Threads requires reentrant code */
-#endif
+#endif /* SCO && _REENTRANT */
+
 #endif /* !defined(__WIN__) */
 
 /* Go around some bugs in different OS and compilers */
@@ -285,6 +290,7 @@ C_MODE_END
 #ifdef HAVE_BROKEN_SNPRINTF	/* HPUX 10.20 don't have this defined */
 #undef HAVE_SNPRINTF
 #endif
+
 #ifdef HAVE_BROKEN_PREAD
 /*
   pread()/pwrite() are not 64 bit safe on HP-UX 11.0 without
@@ -292,15 +298,16 @@ C_MODE_END
 */
 #undef HAVE_PREAD
 #undef HAVE_PWRITE
-#endif
+#endif // HAVE_BROKEN_PREAD
 
 #ifdef UNDEF_HAVE_INITGROUPS			/* For AIX 4.3 */
 #undef HAVE_INITGROUPS
-#endif
+#endif // UNDEF_HAVE_INITGROUPS
 
 #if defined(_lint) && !defined(lint)
 #define lint
 #endif
+
 #if SIZEOF_LONG_LONG > 4 && !defined(_LONG_LONG)
 #define _LONG_LONG 1		/* For AIX string library */
 #endif
@@ -308,10 +315,12 @@ C_MODE_END
 #ifndef stdin
 #include <stdio.h>
 #endif
+
 #include <stdarg.h>
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
+
 #ifdef HAVE_STDDEF_H
 #include <stddef.h>
 #endif
@@ -320,9 +329,11 @@ C_MODE_END
 #ifdef HAVE_LIMITS_H
 #include <limits.h>
 #endif
+
 #ifdef HAVE_FLOAT_H
 #include <float.h>
 #endif
+
 #ifdef HAVE_FENV_H
 #include <fenv.h> /* For fesetround() */
 #endif
@@ -330,29 +341,35 @@ C_MODE_END
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
 #endif
+
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
+
 #ifdef HAVE_SYS_TIMEB_H
 #include <sys/timeb.h>				/* Avoid warnings on SCO */
 #endif
+
 #if TIME_WITH_SYS_TIME
-# include <sys/time.h>
-# include <time.h>
+#include <sys/time.h>
+#include <time.h>
 #else
-# if HAVE_SYS_TIME_H
-#  include <sys/time.h>
-# else
-#  include <time.h>
-# endif
+#if HAVE_SYS_TIME_H
+#include <sys/time.h>
+#else
+#include <time.h>
+#endif /* HAVE_SYS_TIME_H */
 #endif /* TIME_WITH_SYS_TIME */
+
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+
 #if defined(__cplusplus) && defined(NO_CPLUSPLUS_ALLOCA)
 #undef HAVE_ALLOCA
 #undef HAVE_ALLOCA_H
 #endif
+
 #ifdef HAVE_ALLOCA_H
 #include <alloca.h>
 #endif
@@ -392,24 +409,26 @@ C_MODE_END
   {                                                             \
     typedef char compile_time_assert[(X) ? 1 : -1] __attribute__((unused)); \
   } while(0)
-#endif
+#endif /* _some_old_compiler_that_does_not_understand_the_construct_below_ */
 
 /* Go around some bugs in different OS and compilers */
 #if defined (HPUX11) && defined(_LARGEFILE_SOURCE)
 #ifndef _LARGEFILE64_SOURCE
 #define _LARGEFILE64_SOURCE
 #endif
-#endif
+#endif /* defined (HPUX11) && defined(_LARGEFILE_SOURCE) */
 
 #if defined(_HPUX_SOURCE) && defined(HAVE_SYS_STREAM_H)
 #include <sys/stream.h>		/* HPUX 10.20 defines ulong here. UGLY !!! */
 #define HAVE_ULONG
 #endif
+
 #if defined(HPUX10) && defined(_LARGEFILE64_SOURCE)
 /* Fix bug in setrlimit */
 #undef setrlimit
 #define setrlimit cma_setrlimit64
 #endif
+
 /* Declare madvise where it is not declared for C++, like Solaris */
 #if HAVE_MADVISE && !HAVE_DECL_MADVISE && defined(__cplusplus)
 extern "C" int madvise(void *addr, size_t len, int behav);
@@ -495,11 +514,11 @@ typedef unsigned short ushort;
 
 /* We might be forced to turn debug off, if not turned off already */
 #if (defined(FORCE_DBUG_OFF) || defined(_lint)) && !defined(DBUG_OFF)
-#  define DBUG_OFF
-#  ifdef DBUG_ON
-#    undef DBUG_ON
-#  endif
+#define DBUG_OFF
+#ifdef DBUG_ON
+#undef DBUG_ON
 #endif
+#endif /* (defined(FORCE_DBUG_OFF) || defined(_lint)) && !defined(DBUG_OFF) */
 
 /* Some types that is different between systems */
 
@@ -515,6 +534,7 @@ typedef int	my_socket;	/* File descriptor for sockets */
 C_MODE_START
 typedef void	(*sig_return)();/* Returns type from signal */
 C_MODE_END
+
 #if defined(__GNUC__) && !defined(_lint)
 typedef char	pchar;		/* Mixed prototypes can take char */
 typedef char	puchar;		/* Mixed prototypes can take char */
@@ -527,7 +547,7 @@ typedef uint	puchar;		/* Mixed prototypes can't take char */
 typedef int	pbool;		/* Mixed prototypes can't take char */
 typedef int	pshort;		/* Mixed prototypes can't take short int */
 typedef double	pfloat;		/* Mixed prototypes can't take float */
-#endif
+#endif /* defined(__GNUC__) && !defined(_lint) */
 C_MODE_START
 typedef int	(*qsort_cmp)(const void *,const void *);
 typedef int	(*qsort_cmp2)(const void*, const void *,const void *);
@@ -616,7 +636,7 @@ typedef SOCKET_SIZE_TYPE size_socket;
 #define FN_EXEEXT   ""
 #define FN_SOEXT    ".so"
 #define FN_ROOTDIR	"/"
-#endif
+#endif //_WIN32
 
 /* 
   MY_FILE_MIN is  Windows speciality and is used to quickly detect
@@ -702,7 +722,7 @@ inline double my_ulonglong2double(unsigned long long value)
 }
 #define ulonglong2double my_ulonglong2double
 #define my_off_t2double  my_ulonglong2double
-#endif /* _WIN64 */
+#endif /* !_WIN64 */
 inline unsigned long long my_double2ulonglong(double d)
 {
   double t= d - (double) 0x8000000000000000ULL;
@@ -712,7 +732,7 @@ inline unsigned long long my_double2ulonglong(double d)
   return (unsigned long long) d;
 }
 #define double2ulonglong my_double2ulonglong
-#endif
+#endif //_MSC_VER
 
 #ifndef ulonglong2double
 #define ulonglong2double(A) ((double) (ulonglong) (A))
@@ -757,7 +777,7 @@ inline unsigned long long my_double2ulonglong(double d)
 #define ULONGLONG_MAX  ULLONG_MAX
 #else
 #define ULONGLONG_MAX ((unsigned long long)(~0ULL))
-#endif
+#endif //ULLONG_MAX
 #endif /* defined (HAVE_LONG_LONG) && !defined(ULONGLONG_MAX)*/
 
 #define INT_MIN64       (~0x7FFFFFFFFFFFFFFFLL)
@@ -808,7 +828,7 @@ inline unsigned long long my_double2ulonglong(double d)
     #define my_isinf(X) isinf(X)
   #else /* !HAVE_ISINF */
     #define my_isinf(X) (!my_isfinite(X) && !my_isnan(X))
-  #endif
+  #endif //HAVE_ISINF
 #endif /* __cplusplus >= 201103L */
 
 /* Define missing math constants. */

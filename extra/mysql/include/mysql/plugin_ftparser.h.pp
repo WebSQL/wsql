@@ -1,4 +1,4 @@
-#include <mysql/plugin.h>
+#include "plugin.h"
 typedef void * MYSQL_PLUGIN;
 #include <mysql/services.h>
 #include <mysql/service_my_snprintf.h>
@@ -151,53 +151,6 @@ struct st_mysql_plugin
   unsigned long flags;
 };
 #include "plugin_ftparser.h"
-#include "plugin.h"
-enum enum_ftparser_mode
-{
-  MYSQL_FTPARSER_SIMPLE_MODE= 0,
-  MYSQL_FTPARSER_WITH_STOPWORDS= 1,
-  MYSQL_FTPARSER_FULL_BOOLEAN_INFO= 2
-};
-enum enum_ft_token_type
-{
-  FT_TOKEN_EOF= 0,
-  FT_TOKEN_WORD= 1,
-  FT_TOKEN_LEFT_PAREN= 2,
-  FT_TOKEN_RIGHT_PAREN= 3,
-  FT_TOKEN_STOPWORD= 4
-};
-typedef struct st_mysql_ftparser_boolean_info
-{
-  enum enum_ft_token_type type;
-  int yesno;
-  int weight_adjust;
-  char wasign;
-  char trunc;
-  char prev;
-  char *quot;
-} MYSQL_FTPARSER_BOOLEAN_INFO;
-typedef struct st_mysql_ftparser_param
-{
-  int (*mysql_parse)(struct st_mysql_ftparser_param *,
-                     char *doc, int doc_len);
-  int (*mysql_add_word)(struct st_mysql_ftparser_param *,
-                        char *word, int word_len,
-                        MYSQL_FTPARSER_BOOLEAN_INFO *boolean_info);
-  void *ftparser_state;
-  void *mysql_ftparam;
-  const struct charset_info_st *cs;
-  char *doc;
-  int length;
-  int flags;
-  enum enum_ftparser_mode mode;
-} MYSQL_FTPARSER_PARAM;
-struct st_mysql_ftparser
-{
-  int interface_version;
-  int (*parse)(MYSQL_FTPARSER_PARAM *param);
-  int (*init)(MYSQL_FTPARSER_PARAM *param);
-  int (*deinit)(MYSQL_FTPARSER_PARAM *param);
-};
 struct st_mysql_daemon
 {
   int interface_version;
@@ -256,46 +209,49 @@ void mysql_bin_log_unlock_commits(char* binlog_file,
                                   unsigned long long* binlog_pos,
                                   char** gtid_executed,
                                   int* gtid_executed_length);
-#include <mysql/plugin_auth_common.h>
-typedef struct st_plugin_vio_info
+enum enum_ftparser_mode
 {
-  enum { MYSQL_VIO_INVALID, MYSQL_VIO_TCP, MYSQL_VIO_SOCKET,
-         MYSQL_VIO_PIPE, MYSQL_VIO_MEMORY } protocol;
-  int socket;
-} MYSQL_PLUGIN_VIO_INFO;
-struct st_mysql;
-typedef struct st_plugin_vio
+  MYSQL_FTPARSER_SIMPLE_MODE= 0,
+  MYSQL_FTPARSER_WITH_STOPWORDS= 1,
+  MYSQL_FTPARSER_FULL_BOOLEAN_INFO= 2
+};
+enum enum_ft_token_type
 {
-  int (*read_packet)(struct st_plugin_vio *vio,
-                     unsigned char **buf);
-  int (*write_packet)(struct st_plugin_vio *vio,
-                      const unsigned char *packet,
-                      int packet_len);
-  void (*info)(struct st_plugin_vio *vio, struct st_plugin_vio_info *info);
-  struct st_mysql* mysql;
-  int (*read_packet_nonblocking)(struct st_plugin_vio *vio,
-                                 unsigned char **buf,
-                                 int *result);
-  int (*write_packet_nonblocking)(struct st_plugin_vio *vio,
-                                  const unsigned char *packet,
-                                  int packet_len,
-                                  int *result);
-} MYSQL_PLUGIN_VIO;
-typedef struct st_mysql_server_auth_info
+  FT_TOKEN_EOF= 0,
+  FT_TOKEN_WORD= 1,
+  FT_TOKEN_LEFT_PAREN= 2,
+  FT_TOKEN_RIGHT_PAREN= 3,
+  FT_TOKEN_STOPWORD= 4
+};
+typedef struct st_mysql_ftparser_boolean_info
 {
-  char *user_name;
-  unsigned int user_name_length;
-  const char *auth_string;
-  unsigned long auth_string_length;
-  char authenticated_as[96 +1];
-  char external_user[512];
-  int password_used;
-  const char *host_or_ip;
-  unsigned int host_or_ip_length;
-} MYSQL_SERVER_AUTH_INFO;
-struct st_mysql_auth
+  enum enum_ft_token_type type;
+  int yesno;
+  int weight_adjust;
+  char wasign;
+  char trunc;
+  char prev;
+  char *quot;
+} MYSQL_FTPARSER_BOOLEAN_INFO;
+typedef struct st_mysql_ftparser_param
+{
+  int (*mysql_parse)(struct st_mysql_ftparser_param *,
+                     char *doc, int doc_len);
+  int (*mysql_add_word)(struct st_mysql_ftparser_param *,
+                        char *word, int word_len,
+                        MYSQL_FTPARSER_BOOLEAN_INFO *boolean_info);
+  void *ftparser_state;
+  void *mysql_ftparam;
+  const struct charset_info_st *cs;
+  char *doc;
+  int length;
+  int flags;
+  enum enum_ftparser_mode mode;
+} MYSQL_FTPARSER_PARAM;
+struct st_mysql_ftparser
 {
   int interface_version;
-  const char *client_auth_plugin;
-  int (*authenticate_user)(MYSQL_PLUGIN_VIO *vio, MYSQL_SERVER_AUTH_INFO *info);
+  int (*parse)(MYSQL_FTPARSER_PARAM *param);
+  int (*init)(MYSQL_FTPARSER_PARAM *param);
+  int (*deinit)(MYSQL_FTPARSER_PARAM *param);
 };

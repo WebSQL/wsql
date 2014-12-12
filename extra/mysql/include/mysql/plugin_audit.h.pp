@@ -1,4 +1,4 @@
-#include <mysql/plugin.h>
+#include "plugin.h"
 typedef void * MYSQL_PLUGIN;
 #include <mysql/services.h>
 #include <mysql/service_my_snprintf.h>
@@ -256,46 +256,49 @@ void mysql_bin_log_unlock_commits(char* binlog_file,
                                   unsigned long long* binlog_pos,
                                   char** gtid_executed,
                                   int* gtid_executed_length);
-#include <mysql/plugin_auth_common.h>
-typedef struct st_plugin_vio_info
+struct mysql_event_general
 {
-  enum { MYSQL_VIO_INVALID, MYSQL_VIO_TCP, MYSQL_VIO_SOCKET,
-         MYSQL_VIO_PIPE, MYSQL_VIO_MEMORY } protocol;
-  int socket;
-} MYSQL_PLUGIN_VIO_INFO;
-struct st_mysql;
-typedef struct st_plugin_vio
+  unsigned int event_subclass;
+  int general_error_code;
+  unsigned long general_thread_id;
+  const char *general_user;
+  unsigned int general_user_length;
+  const char *general_command;
+  unsigned int general_command_length;
+  const char *general_query;
+  unsigned int general_query_length;
+  struct charset_info_st *general_charset;
+  unsigned long long general_time;
+  unsigned long long general_rows;
+  MYSQL_LEX_STRING general_host;
+  MYSQL_LEX_STRING general_sql_command;
+  MYSQL_LEX_STRING general_external_user;
+  MYSQL_LEX_STRING general_ip;
+};
+struct mysql_event_connection
 {
-  int (*read_packet)(struct st_plugin_vio *vio,
-                     unsigned char **buf);
-  int (*write_packet)(struct st_plugin_vio *vio,
-                      const unsigned char *packet,
-                      int packet_len);
-  void (*info)(struct st_plugin_vio *vio, struct st_plugin_vio_info *info);
-  struct st_mysql* mysql;
-  int (*read_packet_nonblocking)(struct st_plugin_vio *vio,
-                                 unsigned char **buf,
-                                 int *result);
-  int (*write_packet_nonblocking)(struct st_plugin_vio *vio,
-                                  const unsigned char *packet,
-                                  int packet_len,
-                                  int *result);
-} MYSQL_PLUGIN_VIO;
-typedef struct st_mysql_server_auth_info
-{
-  char *user_name;
-  unsigned int user_name_length;
-  const char *auth_string;
-  unsigned long auth_string_length;
-  char authenticated_as[96 +1];
-  char external_user[512];
-  int password_used;
-  const char *host_or_ip;
-  unsigned int host_or_ip_length;
-} MYSQL_SERVER_AUTH_INFO;
-struct st_mysql_auth
+  unsigned int event_subclass;
+  int status;
+  unsigned long thread_id;
+  const char *user;
+  unsigned int user_length;
+  const char *priv_user;
+  unsigned int priv_user_length;
+  const char *external_user;
+  unsigned int external_user_length;
+  const char *proxy_user;
+  unsigned int proxy_user_length;
+  const char *host;
+  unsigned int host_length;
+  const char *ip;
+  unsigned int ip_length;
+  const char *database;
+  unsigned int database_length;
+};
+struct st_mysql_audit
 {
   int interface_version;
-  const char *client_auth_plugin;
-  int (*authenticate_user)(MYSQL_PLUGIN_VIO *vio, MYSQL_SERVER_AUTH_INFO *info);
+  void (*release_thd)(void*);
+  void (*event_notify)(void*, unsigned int, const void *);
+  unsigned long class_mask[1];
 };
