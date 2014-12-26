@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
-import os
+from distutils import log
 from distutils.command.build_ext import build_ext as _build_ext
 from distutils.core import setup, Extension
-from distutils import log
+import os
 
 
 class BuildWebSQL(_build_ext):
@@ -61,6 +61,7 @@ class BuildWebSQL(_build_ext):
 __name__ = "websql"
 __version__ = "1.1.0"
 
+extra_link_args = ["-lstdc++"]
 
 module1 = Extension('_' + __name__,
                     sources=["./src/connections.c",
@@ -72,7 +73,7 @@ module1 = Extension('_' + __name__,
                              "./src/results.c"],
                     libraries=['ssl', 'crypto'],
                     extra_compile_args=["-Os", "-g", "-fno-strict-aliasing", "-std=c99"],
-                    extra_link_args=["-lstdc++"],
+                    extra_link_args=["-lstdc++"] + os.getenv('WEBSQL_EXTRA_LINKER_ARGS').split(),
                     define_macros=[
                         ("MODULE_NAME", '_' + __name__),
                         ("version_info", "(%d, %d, %d, 'beta', 0)" % tuple(map(int, __version__.split('.')))),
