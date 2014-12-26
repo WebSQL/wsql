@@ -3,8 +3,7 @@ python:
   - "3.4"
 
 env:
- - WEBSQL_TEST_DATABASE=websql_test WEBSQL_TEST_USER=root
- - WEBSQL_EXTRA_LINKER_ARGS="-lrt"
+ - WEBSQL_TEST_DATABASE=websql_test WEBSQL_TEST_USER=root WEBSQL_EXTRA_LINKER_ARGS="-lrt"
 
 install:
   - python setup.py install
