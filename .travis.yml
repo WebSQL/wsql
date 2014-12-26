@@ -12,4 +12,4 @@ before_script:
   - mysql -e 'create database websql_test';
 
 script:
- - python python3 -m unittest discover --start-directory tests
+ - python -m unittest discover --start-directory tests
