@@ -1,4 +1,6 @@
 = websql =
+.. image:: https://travis-ci.org/bgaifullin/web-sql.svg?branch=master
+    :target: https://travis-ci.org/bgaifullin/web-sql
 
 It is python binding for webscalesql client.
 
