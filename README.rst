@@ -1,14 +1,15 @@
 WebSQL
 =============
-.. image:: https://travis-ci.org/WebSQL/web-sql.svg?branch=master
-    :target: https://travis-ci.org/WebSQL/web-sql
+.. image:: https://travis-ci.org/WebSQL/websql.svg?branch=master
+    :target: https://travis-ci.org/WebSQL/websql
 
-.. image:: https://coveralls.io/repos/WebSQL/web-sql/badge.png?branch=master
-    :target: https://coveralls.io/r/WebSQL/web-sql?branch=master
+.. image:: https://coveralls.io/repos/WebSQL/websql/badge.png?branch=master
+    :target: https://coveralls.io/r/WebSQL/websql?branch=master
 
 
-WeSQL is a python binding to webscalesql client async library.
+WeSQL is a python binding to webscalesql client library.
 
 Features:
     - DB-API 2.0 compatible.
     - Based on standard asyncio library
+    - Supports async and sync connectors
