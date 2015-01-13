@@ -1,0 +1,3 @@
+[submodule "extra/websqlclient"]
+	path = extra/websqlclient
+	url = git://github.com/WebSQL/websqlclient.git
