@@ -1,3 +1,7 @@
 *~
+*.pyc
+__pycache__/
+/.coverage
+/_websql.so
 /.idea
 /build

@@ -8,7 +8,7 @@ import os
 
 class BuildWebSQL(_build_ext):
     def run(self):
-        path = os.path.abspath('extra/mysql')
+        path = os.path.abspath(os.path.join('extra', 'websqlclient'))
         log.info("building 'websqlclient' library")
         pwd = os.getcwd()
         temp_dir = os.path.join(self.build_temp, 'websqlclient')
@@ -20,7 +20,7 @@ class BuildWebSQL(_build_ext):
         finally:
             os.chdir(pwd)
 
-        self.include_dirs.extend([os.path.join(temp_dir, 'include'), 'extra/mysql/include'])
+        self.include_dirs.extend([os.path.join(temp_dir, 'include'), os.path.join(path, 'include')])
         self.libraries.append('websqlclient')
         self.library_dirs.append(os.path.join(temp_dir, 'libmysql'))
 
@@ -73,7 +73,7 @@ module1 = Extension('_' + __name__,
                              "./src/results.c"],
                     libraries=['ssl', 'crypto'],
                     extra_compile_args=["-Os", "-g", "-fno-strict-aliasing", "-std=c99"],
-                    extra_link_args=["-lstdc++"] + os.getenv('WEBSQL_EXTRA_LINKER_ARGS').split(),
+                    extra_link_args=["-lstdc++"] + os.getenv('WEBSQL_EXTRA_LINKER_ARGS', '').split(),
                     define_macros=[
                         ("MODULE_NAME", '_' + __name__),
                         ("version_info", "(%d, %d, %d, 'beta', 0)" % tuple(map(int, __version__.split('.')))),
