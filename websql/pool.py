@@ -113,9 +113,12 @@ class ConnectionPool(ConnectionPoolBase):
         except self.QueueEmpty:
             pass
 
+        can_create = False
+
         with self._lock:
-            can_create = self._reserve > 0
-            self._reserve -= 1
+            if self._reserve > 0:
+                self._reserve -= 1
+                can_create = True
 
         if can_create:
             return self._factory()
@@ -123,7 +126,7 @@ class ConnectionPool(ConnectionPoolBase):
         try:
             return self._queue.get(timeout=self._timeout)
         except self.QueueEmpty:
-            raise TimeoutError from None
+            raise self.TimeoutError from None
 
     def _release(self, connection):
         """
