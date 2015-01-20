@@ -134,8 +134,6 @@ class CapabilityTestCases(DatabaseTestCase):
 
         if self._context.connection()._server_version >= (5, 6):
             self._check_data_integrity(('col1 TIME(2)',), generator)
-        else:
-            self._check_data_integrity(('col1 TIME',), generator)
 
     def test_date(self):
         """test DATE"""
