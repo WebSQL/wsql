@@ -132,7 +132,10 @@ class CapabilityTestCases(DatabaseTestCase):
                 return timedelta(0, (row + col) * -8000, microseconds=(row + col) * 100000)
             return timedelta(0, (row + col) * 8000, microseconds=(row + col) * 100000)
 
-        self._check_data_integrity(('col1 TIME(2)',), generator)
+        if self._context.connection()._server_version >= (5, 6):
+            self._check_data_integrity(('col1 TIME(2)',), generator)
+        else:
+            self._check_data_integrity(('col1 TIME',), generator)
 
     def test_date(self):
         """test DATE"""
@@ -165,7 +168,11 @@ class CapabilityTestCases(DatabaseTestCase):
 
         def generator(row, col):
             return self._context.module.TimestampFromTicks(ticks + row * 86400 - col * 1313 + row * 0.7 * col / 3.0)
-        self._check_data_integrity(('col1 TIMESTAMP(2)',), generator)
+
+        if self._context.connection()._server_version >= (5, 6):
+            self._check_data_integrity(('col1 TIMESTAMP(2)',), generator)
+        else:
+            self._check_data_integrity(('col1 TIMESTAMP',), generator)
 
     def test_bool(self):
         """test BOOLEAN"""
