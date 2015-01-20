@@ -16,8 +16,3 @@ class TesWebSQLAsyncWebSQLAsyncCapabilities(CapabilityTestCases):
         return WebSQLAsyncContext()
 
 del CapabilityTestCases
-
-
-if __name__ == '__main__':
-    import unittest
-    unittest.main()

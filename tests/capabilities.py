@@ -10,69 +10,27 @@ __unittest = True
 from datetime import timedelta
 from time import time
 from tests.case import DatabaseTestCase
+import struct
 
 
 class CapabilityTestCases(DatabaseTestCase):
-    @classmethod
-    def get_context(cls):
-        raise NotImplementedError
-
     @classmethod
     def _setup_cls(cls):
         cls.BLOBText = ''.join([chr(i) for i in range(256)] * 100)
         cls.BLOBBinary = bytes(range(256)) * 16
 
-    def _create_table(self, columns, generator):
-        """ Create a table using a list of column definitions given in columns.
-            generator must be a function taking arguments (row_number,
-            col_number) returning a suitable data object for insertion
-            into the table.
-        """
-        connection = self._context.connection()
-        cursor = self._context.cursor()
-
-        table = ("table_%d_%f" % (id(self), time())).replace('.', '_')
-        if self._context.debug:
-            print('table name %s' % table)
-        self.tables.append(table)
-
-        cursor.execute('CREATE TABLE %s (%s) %s;' % (table, ','.join(columns), self._context.create_table_extra))
-        if generator is not None:
-            insert_statement = ('INSERT INTO %s VALUES (%s)' % (table, ','.join(['%s'] * len(columns))))
-            data = [[generator(i, j) for j in range(len(columns))] for i in range(self._context.rows)]
-            if self._context.debug:
-                print(data)
-            cursor.executemany(insert_statement, data)
-            connection.commit()
-        return table
-
-    def _create_procedure(self, args, body):
-        connection = self._context.connection()
-        cursor = self._context.cursor()
-
-        procedure = ('procedure_%d_%f' % (id(self), time())).replace('.', '_')
-        self.procedures.append(procedure)
-
-        cursor.execute("""
-        CREATE PROCEDURE %s(%s)
-        BEGIN
-            %s
-        END
-        """ % (procedure, ','.join(args), body))
-
-        connection.commit()
-        return procedure
-
-    def _check_data_integrity(self, columns, generator):
+    def _check_data_integrity(self, columns, generator, check=None):
         """check data integrity"""
         table = self._create_table(columns, generator)
         cursor = self._context.cursor()
         cursor.execute('select * from %s' % table)
         actual = cursor.fetchall()
         self.assertEqual(len(actual), self._context.rows)
+        if check is None:
+            check = self.assertEqual
         for i in range(self._context.rows):
             for j in range(len(columns)):
-                self.assertEqual(actual[i][j], generator(i, j))
+                check(actual[i][j], generator(i, j))
 
     def test_blob(self):
         """test BLOB"""
@@ -150,12 +108,31 @@ class CapabilityTestCases(DatabaseTestCase):
                 return self.BLOBText
         self._check_data_integrity(('col1 INT', 'col2 LONG'), generator)
 
+    def test_float(self):
+        """test_FLOAT"""
+        def generator(row, col):
+            if col == 0:
+                return round(0.1 * row, 4)
+            return round(0.1 * row / col, 4)
+        self._check_data_integrity(('col1 FLOAT(7, 4)', 'col2 DOUBLE(7, 4)'), generator)
+
     def test_time(self):
         """test TIME"""
         def generator(row, col):
+            if (row + col) % 2 == 0:
+                return timedelta(0, (row + col) * -8000)
             return timedelta(0, (row + col) * 8000)
 
         self._check_data_integrity(('col1 TIME',), generator)
+
+    def test_fractional_time(self):
+        """test TIME"""
+        def generator(row, col):
+            if (row + col) % 2 == 0:
+                return timedelta(0, (row + col) * -8000, microseconds=(row + col) * 100000)
+            return timedelta(0, (row + col) * 8000, microseconds=(row + col) * 100000)
+
+        self._check_data_integrity(('col1 TIME(2)',), generator)
 
     def test_date(self):
         """test DATE"""
@@ -188,7 +165,38 @@ class CapabilityTestCases(DatabaseTestCase):
 
         def generator(row, col):
             return self._context.module.TimestampFromTicks(ticks + row * 86400 - col * 1313 + row * 0.7 * col / 3.0)
-        self._check_data_integrity(('col1 TIMESTAMP',), generator)
+        self._check_data_integrity(('col1 TIMESTAMP(2)',), generator)
+
+    def test_bool(self):
+        """test BOOLEAN"""
+        def generator(row, col):
+            return bool(row == col)
+        self._check_data_integrity(('col1 BOOLEAN',), generator)
+
+    def test_set(self):
+        """test SET"""
+        choises = ['a', 'b', 'c', 'd']
+
+        def generator(row, col):
+            if row == col:
+                return set(choises)
+            if row < col:
+                return set(choises[row:col])
+            return set(choises[col:row])
+
+        self._check_data_integrity(('col1 SET(' + ','.join(map(repr, choises)) + ')',), generator)
+
+    def test_bit(self):
+        """test BIT"""
+        def generator(row, col):
+            return struct.pack('>Q', row + col).lstrip(b'\x00')
+
+        def check(actual, expected):
+            if len(expected) < 8:
+                expected = b'\x00' * (8 - len(expected)) + expected
+            self.assertEqual(actual, struct.unpack('>Q', expected)[0])
+
+        self._check_data_integrity(('col1 BIT(7)',), generator, check)
 
     def test_stored_procedures(self):
         """test stored procedures call"""

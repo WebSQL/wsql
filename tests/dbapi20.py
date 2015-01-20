@@ -46,24 +46,22 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
 
     # lowerfunc = 'lower'  # Name of stored procedure to convert string->lowercase
 
-    @classmethod
-    def get_context(cls):
-        raise NotImplementedError
-
     def setUp(self):
         super().setUp()
         self.cursors = []
 
     def tearDown(self):
         for cursor in self.cursors:
-            self._context.unref(cursor.close())
+            self._context.wait(cursor.close())
         super().tearDown()
 
     def test_connect(self):
+        """test connect method of module """
         connection = self._context.make_connection()
         connection.close()
 
     def test_apilevel(self):
+        """test apilevel property of module"""
         try:
             # Must exist
             apilevel = self._context.module.apilevel
@@ -73,6 +71,7 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
             self.fail("Driver doesn't define apilevel")
 
     def test_threadsafety(self):
+        """test threadsafety property of module"""
         try:
             # Must exist
             threadsafety = self._context.module.threadsafety
@@ -82,7 +81,7 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
             self.fail("Driver doesn't define threadsafety")
 
     def test_exceptions(self):
-        """test_Exceptions"""
+        """test exception classes of module"""
         driver = self._context.module
         self.assertTrue(hasattr(driver, 'Warning'))
         self.assertTrue(issubclass(driver.Error, driver.StandardError))
@@ -95,7 +94,7 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
         self.assertTrue(issubclass(driver.NotSupportedError, driver.Error))
 
     def test_exceptions_as_connection_attributes(self):
-        """test_ExceptionsAsConnectionAttributes"""
+        """test exception classes of connection class"""
         # OPTIONAL EXTENSION
         # Test for the optional DB API 2.0 extension, where the exceptions
         # are exposed as attributes on the Connection object
@@ -115,11 +114,13 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
         self.assertIs(connection.NotSupportedError, driver.NotSupportedError)
 
     def test_commit(self):
+        """test commit method of connection class"""
         connection = self._context.connection()
         # Commit must work, even if it doesn't do anything
         connection.commit()
 
     def test_rollback(self):
+        """test rollback method of connection class"""
         connection = self._context.connection()
         # If rollback is defined, it should either work or throw
         # the documented exception
@@ -130,11 +131,13 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
                 pass
 
     def test_cursor(self):
+        """test cursor method of connection class"""
         connection = self._context.connection()
         connection.cursor()
-        self._context.unref(connection.cursor().close())
+        self._context.wait(connection.cursor().close())
 
     def test_cursor_isolation(self):
+        """test isolation of different cursors"""
         connection = self._context.connection()
         # Make sure cursors created from the same connection have
         # the documented transaction isolation level
@@ -144,15 +147,16 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
         self.cursors.append(cur2)
         table = self._unique_name('table')
         self.tables.append(table)
-        self._context.unref(cur1.execute('create table %s (name varchar(20))' % table))
-        self._context.unref(cur1.execute("insert into %s values ('Victoria Bitter')" % table))
-        self._context.unref(cur2.execute("select name from %s" % table))
-        rows = self._context.unref(cur2.fetchall())
+        self._context.wait(cur1.execute('create table %s (name varchar(20))' % table))
+        self._context.wait(cur1.execute("insert into %s values ('Victoria Bitter')" % table))
+        self._context.wait(cur2.execute("select name from %s" % table))
+        rows = self._context.wait(cur2.fetchall())
         self.assertEqual(len(rows), 1)
         self.assertEqual(len(rows[0]), 1)
         self.assertEqual(rows[0][0], 'Victoria Bitter')
 
     def test_description(self):
+        """test description property of cursor"""
         cursor = self._context.cursor()
 
         table = self._create_table(('name varchar(20)',), None)
@@ -192,6 +196,7 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
         )
 
     def test_rowcount(self):
+        """test rowcount property of cursor"""
         cursor = self._context.cursor()
         table = self._create_table(('name varchar(20)',), None)
 
@@ -223,7 +228,32 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
             'no-result statements'
         )
 
+    def test_lastrowid(self):
+        """test lastrowid property of cursor"""
+        cursor = self._context.cursor()
+        table = self._create_table(('id bigint not null auto_increment', 'name varchar(20)',), None, 'PRIMARY KEY(id)')
+        cursor.execute("insert into %s (name) values ('Evelina')" % table)
+        self.assertIn(cursor.lastrowid, (-1, 1))
+        cursor.execute("insert into %s (name) values ('Adelina')" % table)
+        self.assertIn(cursor.lastrowid, (-1, 2))
+
+    def test_rownumber(self):
+        """test rownumber property of cursor"""
+        cursor = self._context.cursor()
+
+        self.assertIsNone(cursor.rownumber)
+
+        table = self._create_table(('name varchar(20)',), lambda x, y: y == 0 and self.SAMPLES[x])
+        self.assertIsNone(cursor.rownumber)
+
+        cursor.execute('select name from %s' % table)
+        self.assertIn(cursor.rownumber, (0, None))
+        cursor.fetchone()
+        self.assertIn(cursor.rownumber, (1, None))
+        cursor.fetchall()
+
     def test_callproc(self):
+        """test callproc method of cursor"""
         cursor = self._context.cursor()
         procedure = self._create_procedure(('s varchar(255)',), 'select lower(s);')
         r = cursor.callproc(procedure, ('FOO',))
@@ -236,6 +266,7 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
         self.assertEqual('foo', r[0][0], 'callproc produced invalid results')
 
     def test_close(self):
+        """test close method of connection"""
         connection = self._context.make_connection()
         try:
             cursor = connection.cursor()
@@ -244,39 +275,41 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
 
         # cursor.execute should raise an Error if called after connection
         # closed
-        self.assertRaises(self._context.module.Error, lambda x: self._context.unref(cursor.execute(x)), 'show tables')
+        self.assertRaises(self._context.module.Error, lambda x: self._context.wait(cursor.execute(x)), 'show tables')
 
         # connection.commit should raise an Error if called after connection'
         # closed.'
-        self.assertRaises(self._context.module.Error, lambda: self._context.unref(connection.commit()))
+        self.assertRaises(self._context.module.Error, lambda: self._context.wait(connection.commit()))
 
         # connection.close should raise an Error if called more than once
         self.assertRaises(self._context.module.Error, connection.close)
 
     PARAM_FORMAT = {
-        'qmark': ('insert into %s values (?)', tuple),
-        'numeric': ('insert into %s values (:1)', tuple),
-        'format': ('insert into %s values (%%s)', tuple),
-        'named': ('insert into %s values (:beer)', lambda x: dict(zip(('beer',), x))),
-        'pyformat': ('insert into %s values (%%(beer)s)', lambda x: dict(zip(('beer',), x))),
+        'qmark': ('(?)', tuple),
+        'numeric': ('(:1)', tuple),
+        'format': ('(%s)', tuple),
+        'named': ('(:beer)', lambda x: dict(zip(('beer',), x))),
+        'pyformat': ('(%(beer)s)', lambda x: dict(zip(('beer',), x))),
     }
 
     def test_paramstyle(self):
+        """test paramstyle property of module"""
         self.assertTrue(hasattr(self._context.module, 'paramstyle'))
         paramstyle = self._context.module.paramstyle
         self.assertIn(paramstyle, self.PARAM_FORMAT)
 
     def test_execute(self):
+        """test execute method of cursor"""
         cursor = self._context.cursor()
         table = self._create_table(('name varchar(20)',), None)
         cursor.execute("insert into %s values ('Victoria Bitter')" % table)
         self.assertIn(cursor.rowcount, (-1, 1))
         try:
-            template, converter = self.PARAM_FORMAT[self._context.module.paramstyle]
+            placeholder, converter = self.PARAM_FORMAT[self._context.module.paramstyle]
         except KeyError:
             self.fail('Invalid paramstyle')
 
-        cursor.execute(template % table, converter(("Cooper's",)))
+        cursor.execute('insert into %s values %s' % (table, placeholder), converter(("Cooper's",)))
         self.assertIn(cursor.rowcount, (-1, 1))
 
         cursor.execute('select name from %s' % table)
@@ -296,15 +329,18 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
         )
 
     def test_executemany(self):
+        """test executemany method of cursor"""
         cursor = self._context.cursor()
         table = self._create_table(('name varchar(20)',), None)
 
         try:
-            template, converter = self.PARAM_FORMAT[self._context.module.paramstyle]
+            placeholder, converter = self.PARAM_FORMAT[self._context.module.paramstyle]
         except KeyError:
             self.fail('Invalid paramstyle')
 
-        cursor.executemany(template % table, (converter(x) for x in (("Cooper's",), ("Boag's",))))
+        self.assertIsNone(cursor.executemany('insert into %s values %s' % (table, placeholder), None))
+
+        cursor.executemany('insert into %s values %s' % (table, placeholder), (converter(x) for x in (("Cooper's",), ("Boag's",))))
 
         self.assertIn(
             cursor.rowcount, (-1, 2),
@@ -321,8 +357,14 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
         beers.sort()
         self.assertEqual("Boag's", beers[0], 'incorrect data retrieved')
         self.assertEqual("Cooper's", beers[1], 'incorrect data retrieved')
+        cursor.executemany('select * from %s where name=%s;' % (table, placeholder), (converter(x) for x in (("Cooper's",), ("Boag's",))))
+        # TODO the result of previous query are not stored. need to rework this part of code
+        self.assertIn(cursor.rowcount, (-1, 2))
+        cursor.fetchall()
+        cursor.nextset()
 
     def test_fetchone(self):
+        """test fetchone method of cursor"""
         cursor = self._context.cursor()
 
         # cursor.fetchone should raise an Error if called before
@@ -373,6 +415,7 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
     ]
 
     def test_fetchmany(self):
+        """test fetchmany method of cursor"""
         cursor = self._context.cursor()
         # cursor.fetchmany should raise an Error if called without
         # issuing a query
@@ -459,6 +502,7 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
         self.assertIn(cursor.rowcount, (-1, 0))
 
     def test_fetchall(self):
+        """test fetchall method of cursor"""
         cursor = self._context.cursor()
         # cursor.fetchall should raise an Error if called
         # without executing a query that may return rows (such
@@ -502,6 +546,7 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
         )
 
     def test_mixedfetch(self):
+        """test mixedfetch method of cursor"""
         cursor = self._context.cursor()
         self._context.rows = len(self.SAMPLES)
         table = self._create_table(('name varchar(20)',), lambda x, y: y == 0 and self.SAMPLES[x])
@@ -533,6 +578,7 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
             )
 
     def test_nextset(self):
+        """test nextset method of cursor"""
         cursor = self._context.cursor()
         self._context.rows = len(self.SAMPLES)
         table = self._create_table(('name varchar(20)',), lambda x, y: y == 0 and self.SAMPLES[x])
@@ -546,9 +592,43 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
         self.assertEqual(len(self.SAMPLES), len(names))
         self.assertIsNone(cursor.nextset(), 'No more return sets, should return None')
 
+    def test_scroll(self):
+        """test scroll method of cursor"""
+        cursor = self._context.cursor()
+        try:
+            cursor.scroll(0)
+        except self._context.module.ProgrammingError:
+            pass
+        except self._context.module.NotSupportedError:
+            return
+
+        self.assertRaises(self._context.module.ProgrammingError, cursor.scroll, 0, 'invalid_mode')
+        self._context.rows = len(self.SAMPLES)
+        table = self._create_table(('name varchar(20)',), lambda x, y: y == 0 and self.SAMPLES[x])
+        cursor.execute('select name from %s' % table)
+        print(cursor.rownumber)
+        cursor.scroll(1, 'absolute')
+        row = cursor.fetchone()
+        self.assertEqual('Carlton Draft', row[0])
+        cursor.scroll(1, 'relative')
+        row = cursor.fetchone()
+        self.assertEqual('Redback', row[0])
+        cursor.fetchall()
+
     def test_arraysize(self):
+        """test arraysize property of cursor"""
         cursor = self._context.cursor()
         self.assertTrue(hasattr(cursor, 'arraysize'), 'cursor.arraysize must be defined')
+
+    def test_setinputsizes(self):
+        """test setinputsize method of cursor"""
+        cursor = self._context.cursor()
+        cursor.setinputsizes(1)
+
+    def test_setoutputsizes(self):
+        """test setoutputsizes method of cursor"""
+        cursor = self._context.cursor()
+        cursor.setoutputsizes(1)
 
     def test_none(self):
         """test None"""

@@ -328,9 +328,14 @@ _mysql_result_object_row_seek(
         r = self->result->data->data + (size_t)offset;
         break;
     default:
-        PyErr_SetString(_mysql_programming_error, "cannot be used with connection.get_result(use=True)");
+        PyErr_SetString(_mysql_programming_error, "unsupported origin");
         return NULL;
     };
+
+    if (r >= mysql_num_rows(self->result)) {
+        PyErr_SetString(PyExc_IndexError, "offset overflow");
+        return NULL;
+    }
 
     mysql_row_seek(self->result, r);
     Py_RETURN_NONE;

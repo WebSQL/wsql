@@ -16,8 +16,3 @@ class TestWebSQLAsyncDBAPI20(DatabaseAPI20TestCases):
         return WebSQLAsyncContext()
 
 del DatabaseAPI20TestCases
-
-
-if __name__ == '__main__':
-    import unittest
-    unittest.main()

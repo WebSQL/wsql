@@ -1,19 +1,18 @@
 """
-MySQLdb
+WebSQL
 =======
-A DB API v2.0 compatible interface to MySQL
+An asynchronous DB API v2.0 compatible interface to MySQL
 -------------------------------------------
 
-This package is a wrapper around _websql, which mostly implements the
-MySQL C API.
+This package is a wrapper around _websql, which mostly implements the MySQL C API.
 
 See the C API specification and the MySQL documentation for more info
 on other items.
 
 For information on the DB API, see PEP-249.
 
-For information on how MySQLdb handles type conversion, see the
-MySQLdb.converters module.
+For information on how websql handles type conversion, see the
+websql.converters module.
 """
 
 from .connections import *

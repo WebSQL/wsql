@@ -12,7 +12,7 @@ class DatabaseTestCase(TestCase):
 
     @classmethod
     def get_context(cls):
-        raise NotImplementedError
+        pass
 
     @classmethod
     def _setup_cls(cls):
@@ -26,6 +26,7 @@ class DatabaseTestCase(TestCase):
     @classmethod
     def tearDownClass(cls):
         cls._context.clean()
+        cls._context = None
 
     def setUp(self):
         self._context.setup()
@@ -45,9 +46,15 @@ class DatabaseTestCase(TestCase):
         self._context.tear_down()
 
     def _unique_name(self, kind):
+        """
+        :param kind: table|procedure
+        :type kind: str
+        :return: the unique name
+        :rtype: str
+        """
         return ('%s_%s_%f' % (self.__class__.__name__.lower(), kind, time())).replace('.', '_')
 
-    def _create_table(self, columns, generator):
+    def _create_table(self, columns, generator, columns_extra=None):
         """ Create a table using a list of column definitions given in columns.
             generator must be a function taking arguments (row_number,
             col_number) returning a suitable data object for insertion
@@ -61,7 +68,12 @@ class DatabaseTestCase(TestCase):
             print('table name %s' % table)
         self.tables.append(table)
 
-        cursor.execute('CREATE TABLE %s (%s) %s;' % (table, ','.join(columns), self._context.create_table_extra))
+        if columns_extra is None:
+            columns_extra = ''
+        else:
+            columns_extra = ',' + columns_extra
+
+        cursor.execute('CREATE TABLE %s (%s %s) %s;' % (table, ','.join(columns), columns_extra, self._context.create_table_extra))
         if generator is not None:
             insert_statement = ('INSERT INTO %s VALUES (%s)' % (table, ','.join(['%s'] * len(columns))))
             data = [[generator(i, j) for j in range(len(columns))] for i in range(self._context.rows)]

@@ -2,12 +2,12 @@
 WebSQL Connections
 -------------------
 
-This module implements connections for MySQLdb. Presently there is
-only one class: Connection. Others are unlikely. However, you might
-want to make your own subclasses. In most cases, you will probably
-override Connection.default_cursor with a non-standard Cursor class.
-
+This module implements connections for WebSQL.
+You should not try to
+create Connection directly; use connect method instead.
 """
+
+__author = "@bg"
 
 from .converters import default_decoders, default_encoders, default_row_formatter
 import _websql
@@ -38,45 +38,59 @@ def connect(*args, nonblocking=None, **kwargs):
     for more information.
 
     :param host: host to connect
+    :type host: str
     :param user: user to connect as
+    :type user: str
     :param password: password to use
+    :type password: str
     :param database: database to use
+    :type database: str
     :param port: TCP/IP port to connect to
+    :type port: int
     :param socket_name: the UNIX socket name to use for connections to "localhost" under UNIX
                         or the pipe name for named pipe connections under Windows.
+    :type socket_name: str
     :param decoders: SQL decoder stack
+    :type decoders: list|tuple
     :param encoders: SQL encoder stack
+    :type encoders: list|tuple
     :param connect_timeout: number of seconds to wait before the connection attempt fails.
+    :type connect_timeout: number
     :param compress: if set, compression is enabled
+    :type compress: bool
     :param init_command: command which is run once the connection is created
+    :type init_command: str
     :param read_default_file: file from which default client values are read
+    :type read_default_file: str
     :param read_default_group: configuration group to use from the default file
+    :type read_default_group: str
     :param use_unicode: If True, text-like columns are returned as unicode objects
                         using the connection's character set.  Otherwise, text-like
                         columns are returned as strings.  columns are returned as
                         normal strings. Unicode objects will always be encoded to
                         the connection's character set regardless of this setting.
-
+    :type use_unicode: bool
     :param charset:     If supplied, the connection character set will be changed
                         to this character set (MySQL-4.1 and newer). This implies use_unicode=True.
-
+    :type charset: str
     :param sql_mode:    If supplied, the session SQL mode will be changed to this
                         setting (MySQL-4.1 and newer). For more details and legal
                         values, see the MySQL documentation.
-
-    :param client_flag: integer, flags to use or 0 (see MySQL docs or constants.CLIENT_*)
-
+    :type sql_mode: str
+    :param client_flag: flags to use or 0 (see MySQL docs or constants.CLIENT_*)
+    :type sql_mode: int
     :param ssl:         dictionary or mapping, contains SSL connection parameters;
                         see the MySQL documentation for more details
                         (mysql_ssl_set()).  If this is set, and the client does not
                         support SSL, NotSupportedError will be raised.
-
+    :type ssl: dict|mapping
     :param local_infile: integer, non-zero enables LOAD LOCAL INFILE; zero disables
-
+    :type local_infile: bool
     :param nonblocking: if set, will be used asynchronous API,
                         If this is set, and client does not support non-blocking, NotSupportedError will be raised.
-
+    :type nonblocking: bool
     :return: new coroutine in nonblocking mode and connection otherwise
+    :rtype: coroutine|Connection
     """
 
     if nonblocking:
@@ -137,10 +151,9 @@ class ConnectionBase(object):
 
     def cursor(self):
         """
-            Create a cursor on which queries may be performed.
-            The optional
-            cursorclass parameter is used to create the Cursor. By default,
-            self.cursorclass=cursors.Cursor is used.
+            Create a cursor instance of cursorclass on which queries may be performed.
+            :return the new cursor object
+            :rtype cursorclass
         """
         encoders = self.encoders
         decoders = self.decoders
@@ -173,18 +186,25 @@ class Connection(ConnectionBase):
             self.commit()
 
     def query(self, query):
+        """
+        Note: do not use this method directly, use cursor instead
+        :param query: the sql query to perform
+        :type query: bytes|str
+        :return: None
+        """
         if isinstance(query, str):
             query = query.encode(self._db.charset)
         return self._db.query(query)
 
     def show_warnings(self):
         """
-        Return detailed information about warnings as a sequence of tuples
-        of (Level, Code, Message). This is only supported in MySQL-4.1 and up.
-        If your server is an earlier version, an empty sequence is returned.
-
         Non-standard. This is invoked automatically after executing a query,
         so you should not usually call it yourself.
+
+        :return  detailed information about warnings as a sequence of tuples
+        of (Level, Code, Message). This is only supported in MySQL-4.1 and up.
+        If your server is an earlier version, it will be an empty sequence.
+        :rtype tuple
         """
         if self._server_version < (4, 1):
             return tuple()
@@ -192,6 +212,13 @@ class Connection(ConnectionBase):
         return tuple(self._db.get_result(False))
 
     def ping(self, reconnect=False):
+        """
+        check that connection to server is still alive
+        if connection lost and cannot reconnect, the exception will be raised
+        :param reconnect: if True, in case if connection is lost, the cline will try to reconnect
+        :return None
+        """
+
         if reconnect and not self._db.autocommit:
             raise self.ProgrammingError("autocommit must be enabled before enabling auto-reconnect; consider the consequences")
         return self._db.ping(reconnect)
@@ -212,6 +239,16 @@ class ConnectionAsync(ConnectionBase):
         self._server_version = None
 
     def setup(self, charset, sql_mode):
+        """
+        :param charset:  If supplied, the connection character set will be changed
+                         to this character set (MySQL-4.1 and newer). This implies use_unicode=True.
+        :type charset: str
+        :param sql_mode: If supplied, the session SQL mode will be changed to this
+                         setting (MySQL-4.1 and newer). For more details and legal
+                         values, see the MySQL documentation.
+        :type sql_mode: str
+        :return: None
+        """
         self._server_version = tuple(int(n) for n in self._db.server_info.split('.')[:2])
         if charset:
             self._db.charset = charset
@@ -224,46 +261,53 @@ class ConnectionAsync(ConnectionBase):
         start asynchronous connection
         Non-standard
         :return promise
+        :rtype Future
         """
         return self.promise(self._db.run_async)
 
     def query(self, query):
         """
         :param query: string query
-        :return: promise
+        :type query: str|bytes
+        :return promise
+        :rtype Future
         """
         return self.promise(self._db.query_async, query)
 
     def next_result(self):
         """
         next result set (internal)
-        :return: promise
+        :return promise
+        :rtype Future
         """
         return self.promise(self._db.next_result_async)
 
     def commit(self):
         """
         commit transaction
-        :return: promise
+        :return promise
+        :rtype Future
         """
         return self.query(b"COMMIT")
 
     def rollback(self):
         """
         rollback transaction
-        :return: promise
+        :return promise
+        :rtype Future
         """
         return self.query(b"ROLLBACK")
 
     @asyncio.coroutine
     def show_warnings(self):
         """
+        Non-standard. This is invoked automatically after executing a query,
+        so you should not usually call it yourself.
+
         :return list, the detailed information about warnings as a sequence of tuples
         of (Level, Code, Message). This is only supported in MySQL-4.1 and up.
         If your server is an earlier version, an empty sequence is returned.
-
-        Non-standard. This is invoked automatically after executing a query,
-        so you should not usually call it yourself.
+        :rtype list
         """
         if self._server_version < (4, 1):
             return list()
@@ -272,25 +316,49 @@ class ConnectionAsync(ConnectionBase):
         result = self.get_result(False)
         warnings = list()
         while True:
-            row = yield from self.promise(result.fetch_row)
+            row = yield from self.promise(result.fetch_row_async)
             if row is None:
                 break
             warnings.append(row)
         return warnings
 
     def add_read_callback(self, callback, *args):
+        """
+        register the read callback on self socket
+        :param callback: callable object, that will be called on event
+        :param args: arguments that will be passed to callback
+        :return: None
+        """
         self._loop.add_reader(self._db.fd, callback, *args)
 
     def add_write_callback(self, callback, *args):
+        """
+        register the write callback on self socket
+        :param callback: callable object, that will be called on event
+        :param args: arguments that will be passed to callback
+        :return: None
+        """
         self._loop.add_writer(self._db.fd, callback, *args)
 
     def remove_read_callback(self):
+        """
+        remove read callback
+        :return: None
+        """
         self._loop.remove_reader(self._db.fd)
 
     def remove_write_callback(self):
+        """
+        remove read callback
+        :return: None
+        """
         self._loop.remove_writer(self._db.fd)
 
     def remove_callback(self):
+        """
+        remove previously registered callback
+        :return: None
+        """
         operation = self._db.async_operation
         if operation == self.NET_ASYNC_READ:
             self.remove_read_callback()
@@ -300,6 +368,13 @@ class ConnectionAsync(ConnectionBase):
             raise RuntimeError("Unexpected async operation: %d" % operation)
 
     def add_callback(self, callback, *args):
+        """
+        register a new callback on socket
+        :param: callback: callable object
+        :param args: arguments that will be passed to callback
+        :return: None
+        """
+
         operation = self._db.async_operation
         if operation == self.NET_ASYNC_READ:
             self.add_read_callback(callback, *args)
@@ -309,6 +384,14 @@ class ConnectionAsync(ConnectionBase):
             raise RuntimeError("Unexpected async operation: %d" % operation)
 
     def wrap_callback(self, fut, registered, func, *args):
+        """
+        Wrap the callback
+        :param fut: Future
+        :param registered: flag, True if callback was register before
+        :param func: callback method
+        :param args: arguments that will be passed to callback
+        :return: None
+        """
         if registered:
             self.remove_callback()
         if fut.cancelled():
@@ -320,11 +403,18 @@ class ConnectionAsync(ConnectionBase):
             elif status[0] == self.NET_ASYNC_NOT_READY:
                 self.add_callback(self.wrap_callback, fut, True, func, *args)
             else:
-                raise RuntimeError("Unexpected async status: %d" % status)
+                raise RuntimeError("Unexpected async status: %d" % status[0])
         except Exception as exc:
             fut.set_exception(exc)
 
-    def promise(self, callback, *args):
+    def promise(self, func, *args):
+        """
+        Wrap non-blocking call and return promis
+        :param func: non-blocking function
+        :param args: function arguments
+        :return: promis
+        :rtype Future
+        """
         fut = self._Future(loop=self._loop)
-        self.wrap_callback(fut, False, callback, *args)
+        self.wrap_callback(fut, False, func, *args)
         return fut

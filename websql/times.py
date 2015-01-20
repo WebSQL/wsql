@@ -8,7 +8,7 @@ daylight savings time setting. XXX
 This module provides some help functions for dealing with MySQL data.
 Most of these you will not have to use directly.
 
-Uses Python datetime module to handle time-releated columns."""
+Uses Python datetime module to handle time-related columns."""
 
 from time import localtime
 from datetime import date, datetime, time, timedelta
@@ -74,8 +74,3 @@ def timestamp_from_ticks(ticks):
     return datetime(*localtime(ticks)[:6])
 
 TimestampFromTicks = timestamp_from_ticks
-
-
-if __name__ == "__main__":
-    import doctest
-    doctest.testmod()

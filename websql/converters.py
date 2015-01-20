@@ -4,7 +4,6 @@ WebSQL type conversion module
 """
 
 from decimal import Decimal
-from math import modf
 import datetime
 import struct
 import _websql
@@ -26,21 +25,9 @@ def set_to_sql(connection, value):
     return connection.quote(','.join(value)).decode(connection.charset)
 
 
-def sql_to_set(value):
-    """Convert MySQL SET column to Python set."""
-    return {i for i in value.split(',') if i}
-
-
-def object_to_sql(connection, obj):
-    """Convert something into a string via str().
-    The result will not be quoted."""
-    return str_to_sql(connection, str(obj))
-
-
 def str_to_sql(connection, value):
     """Convert a string object to a sql string literal by using connection encoding."""
-    charset = connection.charset
-    return connection.quote(value.encode(charset))
+    return connection.quote(value.encode(connection.charset))
 
 
 def bytes_to_sql(connection, value):
@@ -75,9 +62,13 @@ def none_to_sql(*_):
 
 def timedelta_to_sql(_, obj):
     """Convert timedelta to a SQL literal"""
-    seconds = int(obj.seconds) % 60
-    minutes = int(obj.seconds / 60) % 60
-    hours = int(obj.seconds / 3600) % 24
+    total_seconds = obj.seconds
+    seconds = total_seconds % 60
+    minutes = (total_seconds // 60) % 60
+    hours = (total_seconds // 3600) % 24
+    if obj.days < 0:
+        hours = -hours
+
     if obj.microseconds:
         return ("'%02d:%02d:%02d.%06d'" % (hours, minutes, seconds, obj.microseconds)).encode('ascii')
     return ("'%02d:%02d:%02d'" % (hours, minutes, seconds)).encode('ascii')
@@ -93,32 +84,34 @@ def sql_to_date(obj):
     return datetime.date(*map(int, obj.split(b'-')))
 
 
+def _split_time(t):
+    """split time to seconds and microseconds"""
+    parts = t.split(b'.')
+    hour, minutes, seconds = map(int, parts[0].split(b':'))
+    if len(parts) == 2:
+        mcs = int(parts[1].ljust(6, b'0'))
+    else:
+        mcs = 0
+    return hour, minutes, seconds, mcs
+
+
 def sql_to_datetime(obj):
     """Convert a SQL literal to datetime"""
     date_, time_ = obj.split(b' ')
-    if len(time_) > 8:
-        hms, mcs = time_.split(b'.')
-        mcs = int(mcs.ljust(6, b'0'))
-    else:
-        hms = time_
-        mcs = 0
-
     parts = [int(i) for i in date_.split(b'-')]
-    parts.extend(map(int, hms.split(b':')))
-    parts.append(mcs)
+    parts.extend(_split_time(time_))
     return datetime.datetime(*parts)
 
 
 def sql_to_timedelta(obj):
     """Convert a SQL literal to timedelta"""
-    hours, minutes, seconds = obj.split(b':')
+    hours, minutes, seconds, mcs = _split_time(obj)
     delta = datetime.timedelta(
-        hours=int(hours),
+        days=-(hours < 0),
+        hours=abs(hours),
         minutes=int(minutes),
         seconds=int(seconds),
-        microseconds=int(modf(float(seconds))[0] * 1000000))
-    if delta.seconds < 0:
-        return -delta
+        microseconds=mcs)
     return delta
 
 
@@ -135,9 +128,6 @@ def any_to_sql(connection, obj):
 
 
 def none_if_null(func):
-    if func is None:
-        return func
-
     def _none_if_null(value):
         return value if value is None else func(value)
     _none_if_null.__name__ = func.__name__ + "_or_None_if_NULL"
@@ -147,7 +137,6 @@ def none_if_null(func):
 int_or_None_if_NULL = none_if_null(int)
 float_or_None_if_NULL = none_if_null(float)
 decimal_or_None_if_NULL = none_if_null(sql_to_decimal)
-set_or_None_if_NULL = none_if_null(sql_to_set)
 datetime_or_None_if_NULL = none_if_null(sql_to_datetime)
 date_or_None_if_NULL = none_if_null(sql_to_date)
 timedelta_or_None_if_NULL = none_if_null(sql_to_timedelta)
@@ -162,6 +151,7 @@ simple_type_encoders = {
     datetime.timedelta: timedelta_to_sql,
     float: float_to_sql,
     int: int_to_sql,
+    Decimal: decimal_to_sql,
     set: set_to_sql,
     str: str_to_sql,
     type(None): none_to_sql
@@ -197,7 +187,6 @@ simple_field_decoders = {
     _websql.constants.FIELD_TYPE_TIME: timedelta_or_None_if_NULL,
 
     _websql.constants.FIELD_TYPE_BIT: bit_or_None_if_NULL,
-    _websql.constants.FIELD_TYPE_SET: set_or_None_if_NULL
 }
 
 # Decoder protocol
@@ -241,6 +230,7 @@ character_types = {
     _websql.constants.FIELD_TYPE_STRING,
     _websql.constants.FIELD_TYPE_VAR_STRING,
     _websql.constants.FIELD_TYPE_VARCHAR,
+    _websql.constants.FIELD_TYPE_SET
 }
 
 
@@ -251,15 +241,15 @@ def character_decoder(connection, field):
     if field.flags & _FLAG_BINARY:
         return bytes_or_None_if_NULL
 
-    if field.flags & _FLAG_SET:
-        return set_or_None_if_NULL
-
     charset = connection.charset
 
     def char_to_str(s):
-        return s if s is None else s.decode(charset)
+        return s.decode(charset)
 
-    return char_to_str
+    if field.flags & _FLAG_SET:
+        return none_if_null(lambda x: {char_to_str(s) for s in x.split(b',') if s})
+
+    return none_if_null(char_to_str)
 
 
 default_decoders = [

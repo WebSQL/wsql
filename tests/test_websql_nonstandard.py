@@ -2,6 +2,7 @@ from tests.case import DatabaseTestCase, TestCase
 from tests.websql_context import WebSQLContext, WebSQLAsyncContext
 import websql
 import _websql
+import warnings
 
 
 class TestDBAPISet(TestCase):
@@ -41,10 +42,6 @@ class TestCoreModule(TestCase):
 
 class CoreAPI(DatabaseTestCase):
     """Test _mysql interaction internals."""
-    @classmethod
-    def get_context(cls):
-        raise NotImplementedError
-
     def test_thread_id(self):
         connection = self._context.connection()
         self.assertIsInstance(connection.thread_id, int, "thread_id didn't return an int.")
@@ -83,6 +80,59 @@ class TestCoreAsyncApi(CoreAPI):
 
 del CoreAPI
 
-if __name__ == '__main__':
-    import unittest
-    unittest.main()
+
+class TestCursorBase(DatabaseTestCase):
+    def __check_warning(self, message, func, *args):
+        with warnings.catch_warnings(record=True) as records:
+            try:
+                func(*args)
+            except Warning as w:
+                records.append(w)
+            if message is not None:
+                self.assertEqual(1, len(records))
+                self.assertIn(message, str(records[0]))
+            else:
+                self.assertEqual(0, len(records))
+
+    def test_warning_if_not_closed(self):
+        """test unclosed cursor generate warning on delete"""
+        cursor = self._context.wrap(self._context.connection().cursor())
+        try:
+            cursor.execute('select 1;')
+            self.__check_warning('unclosed', cursor.__del__)
+        finally:
+            cursor.close()
+
+    def test_clean_resources_on_close(self):
+        """test free resources when close cursor"""
+        cursor = self._context.wrap(self._context.connection().cursor())
+        cursor.execute('select 1; select 2')
+        cursor.close()
+        self.__check_warning(None, cursor.__del__)
+
+    def test_warnings_check(self):
+        """test warning_check method of cursor"""
+        cursor = self._context.wrap(self._context.connection().cursor())
+        try:
+            self.__check_warning('Unknown table', cursor.execute, 'drop table if exists %s' % self._unique_name('table'))
+        finally:
+            cursor.close()
+
+
+class TestCursor(TestCursorBase):
+    @classmethod
+    def get_context(cls):
+        return WebSQLContext()
+
+    def test_context_manager(self):
+        # in case if cursor will not closed warning will be raised
+        with self._context.connection().cursor() as cursor:
+            cursor.execute('select 1;')
+
+
+class TestCursorAsync(TestCursorBase):
+    @classmethod
+    def get_context(cls):
+        return WebSQLAsyncContext()
+
+del TestCursorBase

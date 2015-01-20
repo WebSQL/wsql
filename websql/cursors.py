@@ -2,8 +2,8 @@
 WebSQL Cursors
 ---------------
 
-This module implements the Cursor class. You should not try to
-create Cursors direction; use connection.cursor() instead.
+This module implements the Cursor classes. You should not try to
+create Cursors directly; use connection.cursor() instead.
 
 """
 
@@ -110,15 +110,15 @@ class CursorBase:
     @property
     def rownumber(self):
         """
+        Not supported yet
         :return:  the current 0-based index of the cursor in the result set or None if the index cannot be determined.
         """
-        if self._result:
-            return self._result.tell()
+        return None
 
     @property
     def lastrowid(self):
         """
-        :return: he rowid of the last modified row
+        :return: rowid of the last modified row
                  (most databases return a rowid only when a single INSERT operation is performed).
                  If the operation does not set a rowid or if the database does not support rowids,
                  this attribute should be set to None.
@@ -344,17 +344,9 @@ class Cursor(CursorBase):
         If mode is 'relative' (default), value is taken as offset to
         the current position in the result set, if set to 'absolute',
         value states an absolute target position.
+        Not supported yet
         """
-        origin = 0
-        self._check_has_result()
-        if mode == 'relative':
-            origin = 1  # SEEK_CUR
-        elif mode == 'absolute':
-            origin = 0  # SEEK_SET
-        else:
-            self.errorhandler(self.ProgrammingError("unknown scroll mode %s" % (mode,)))
-
-        self._result.row_seek(offset, origin)
+        raise self.NotSupportedError
 
 
 class CursorAsync(CursorBase):
@@ -575,3 +567,13 @@ class CursorAsync(CursorBase):
                 break
             append(row)
         return rows
+
+    def scroll(self, offset, mode='relative'):
+        """
+        Scroll the cursor in the result set to a new position according to mode.
+        If mode is 'relative' (default), value is taken as offset to
+        the current position in the result set, if set to 'absolute',
+        value states an absolute target position.
+        Not supported yet
+        """
+        raise self.NotSupportedError
