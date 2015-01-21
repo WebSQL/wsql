@@ -5,7 +5,87 @@ __author__ = "@bg"
 
 from tests.websql_context import WebSQLSetupAsync, WebSQLSetup
 from unittest import TestCase
-from websql.pool import ConnectionPool, ConnectionPoolAsync
+from websql import pool
+
+
+class DummyLogger:
+    @staticmethod
+    def error(msg, *args, **kwargs):
+        pass
+
+
+class TestProviderBase(TestCase):
+    setup = None
+    provider_class = None
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.setup.clean()
+        cls.setup = None
+
+    def tearDown(self):
+        self.pool = None
+
+    def test_server_info(self):
+        srv_info = pool.ServerInfo({'host': 'localhost', 'port': 3306})
+        self.assertEqual('localhost:3306', str(srv_info))
+        srv_info = pool.ServerInfo({'socket_name': '/var/tmp/socket.sock'})
+        self.assertEqual('/var/tmp/socket.sock', str(srv_info))
+
+    def test_connect(self):
+        """test connect method of ConnectionProvider"""
+        kwargs2 = self.setup.connect_kwargs.copy()
+        kwargs2['port'] = 1
+        provider = self.make_provider([kwargs2, self.setup.connect_kwargs])
+        connection = self.setup.wait(provider.connect())
+        connection2 = self.setup.wait(provider.connect())
+        self.assertIs(self.setup.connect_kwargs, connection.meta_info.kwargs)
+        self.assertIs(self.setup.connect_kwargs, connection2.meta_info.kwargs)
+        self.assertGreater(provider._servers[0].penalty, 0)
+
+    def test_no_connections(self):
+        """test case when there is no online servers more"""
+        kwargs2 = self.setup.connect_kwargs.copy()
+        kwargs2['port'] = 1
+        provider = self.make_provider([kwargs2])
+        self.assertRaises(RuntimeError, lambda: self.setup.wait(provider.connect()))
+
+    def test_invalidate(self):
+        """test invalidate method of ConnectionProvider"""
+        provider = self.make_provider([self.setup.connect_kwargs])
+        connection = self.setup.wait(provider.connect())
+        provider.invalidate(connection)
+        self.assertGreater(connection.meta_info.penalty, 0)
+        connection.meta_info.penalty = 0
+        provider.invalidate(connection.meta_info)
+        self.assertGreater(connection.meta_info.penalty, 0)
+        self.assertGreater(provider._servers[0].penalty, 0)
+
+    def make_provider(self, servers):
+        """abstract method to create a new provider"""
+        raise NotImplementedError
+
+
+class TestProvider(TestProviderBase):
+    @classmethod
+    def setUpClass(cls):
+        cls.setup = WebSQLSetup()
+
+    def make_provider(self, servers):
+        """abstract method to create a new provider"""
+        return pool.ConnectionProvider(servers, DummyLogger)
+
+
+class TestProviderAsync(TestProviderBase):
+    @classmethod
+    def setUpClass(cls):
+        cls.setup = WebSQLSetupAsync()
+
+    def make_provider(self, servers):
+        """abstract method to create a new provider"""
+        return pool.ConnectionProviderAsync(servers, DummyLogger, loop=self.setup.loop)
+
+del TestProviderBase
 
 
 class TestPollBase(TestCase):
@@ -18,6 +98,9 @@ class TestPollBase(TestCase):
     def tearDownClass(cls):
         cls.setup.clean()
         cls.setup = None
+
+    def tearDown(self):
+        self.pool = None
 
     def test_acquire(self):
         """test _acquire method of ConnectionPoolAsync"""
@@ -71,10 +154,8 @@ class TestPool(TestPollBase):
         cls.setup = WebSQLSetup()
 
     def setUp(self):
-        self.pool = ConnectionPool(self.setup.connect, self.pool_size, timeout=self.timeout)
-
-    def tearDown(self):
-        self.pool = None
+        provider = pool.ConnectionProvider([self.setup.connect_kwargs], DummyLogger)
+        self.pool = pool.ConnectionPool(provider, self.pool_size, timeout=self.timeout)
 
 
 class TestPoolAsync(TestPollBase):
@@ -83,9 +164,8 @@ class TestPoolAsync(TestPollBase):
         cls.setup = WebSQLSetupAsync()
 
     def setUp(self):
-        self.pool = ConnectionPoolAsync(self.setup.connect, self.pool_size, timeout=self.timeout, loop=self.setup.loop)
+        provider = pool.ConnectionProviderAsync([self.setup.connect_kwargs], DummyLogger, loop=self.setup.loop)
+        self.pool = pool.ConnectionPoolAsync(provider, self.pool_size, timeout=self.timeout, loop=self.setup.loop)
 
-    def tearDown(self):
-        self.pool = None
 
 del TestPollBase
