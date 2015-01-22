@@ -5,13 +5,22 @@ __author__ = "@bg"
 
 from tests.websql_context import WebSQLSetupAsync, WebSQLSetup
 from unittest import TestCase
-from websql import pool
+from websql.fabric import ConnectionPool, ConnectionProvider
+from websql.fabric.provider import ServerInfo
 
 
 class DummyLogger:
     @staticmethod
     def error(msg, *args, **kwargs):
         pass
+
+
+class TestServerInfo(TestCase):
+    def test_to_str(self):
+        srv_info = ServerInfo({'host': 'localhost', 'port': 3306})
+        self.assertEqual('localhost:3306', str(srv_info))
+        srv_info = ServerInfo({'socket_name': '/var/tmp/socket.sock'})
+        self.assertEqual('/var/tmp/socket.sock', str(srv_info))
 
 
 class TestProviderBase(TestCase):
@@ -26,12 +35,6 @@ class TestProviderBase(TestCase):
     def tearDown(self):
         self.pool = None
 
-    def test_server_info(self):
-        srv_info = pool.ServerInfo({'host': 'localhost', 'port': 3306})
-        self.assertEqual('localhost:3306', str(srv_info))
-        srv_info = pool.ServerInfo({'socket_name': '/var/tmp/socket.sock'})
-        self.assertEqual('/var/tmp/socket.sock', str(srv_info))
-
     def test_connect(self):
         """test connect method of ConnectionProvider"""
         kwargs2 = self.setup.connect_kwargs.copy()
@@ -39,8 +42,8 @@ class TestProviderBase(TestCase):
         provider = self.make_provider([kwargs2, self.setup.connect_kwargs])
         connection = self.setup.wait(provider.connect())
         connection2 = self.setup.wait(provider.connect())
-        self.assertIs(self.setup.connect_kwargs, connection.meta_info.kwargs)
-        self.assertIs(self.setup.connect_kwargs, connection2.meta_info.kwargs)
+        self.assertIs(self.setup.connect_kwargs, connection.meta.kwargs)
+        self.assertIs(self.setup.connect_kwargs, connection2.meta.kwargs)
         self.assertGreater(provider._servers[0].penalty, 0)
 
     def test_no_connections(self):
@@ -55,11 +58,12 @@ class TestProviderBase(TestCase):
         provider = self.make_provider([self.setup.connect_kwargs])
         connection = self.setup.wait(provider.connect())
         provider.invalidate(connection)
-        self.assertGreater(connection.meta_info.penalty, 0)
-        connection.meta_info.penalty = 0
-        provider.invalidate(connection.meta_info)
-        self.assertGreater(connection.meta_info.penalty, 0)
+        self.assertGreater(connection.meta.penalty, 0)
+        connection.meta.penalty = 0
+        provider.invalidate(connection.meta)
+        self.assertGreater(connection.meta.penalty, 0)
         self.assertGreater(provider._servers[0].penalty, 0)
+        self.assertRaises(ValueError, provider.invalidate, 1)
 
     def make_provider(self, servers):
         """abstract method to create a new provider"""
@@ -73,7 +77,7 @@ class TestProvider(TestProviderBase):
 
     def make_provider(self, servers):
         """abstract method to create a new provider"""
-        return pool.ConnectionProvider(servers, DummyLogger)
+        return ConnectionProvider(servers, DummyLogger, nonblocking=False)
 
 
 class TestProviderAsync(TestProviderBase):
@@ -83,7 +87,7 @@ class TestProviderAsync(TestProviderBase):
 
     def make_provider(self, servers):
         """abstract method to create a new provider"""
-        return pool.ConnectionProviderAsync(servers, DummyLogger, loop=self.setup.loop)
+        return ConnectionProvider(servers, DummyLogger, loop=self.setup.loop, nonblocking=True)
 
 del TestProviderBase
 
@@ -125,7 +129,7 @@ class TestPollBase(TestCase):
         connection = self.setup.wait(self.pool._acquire())
         self.assertIsNotNone(connection)
         self.assertEqual(0, self.pool._queue.qsize())
-        connection.close()
+        connection.connection.close()
         self.pool._release(connection)
         self.assertEqual(0, self.pool._queue.qsize())
         self.assertEqual(self.pool_size, self.pool._reserve)
@@ -154,8 +158,8 @@ class TestPool(TestPollBase):
         cls.setup = WebSQLSetup()
 
     def setUp(self):
-        provider = pool.ConnectionProvider([self.setup.connect_kwargs], DummyLogger)
-        self.pool = pool.ConnectionPool(provider, self.pool_size, timeout=self.timeout)
+        provider = ConnectionProvider([self.setup.connect_kwargs], DummyLogger, nonblocking=False)
+        self.pool = ConnectionPool(provider, self.pool_size, timeout=self.timeout, nonblocking=False)
 
 
 class TestPoolAsync(TestPollBase):
@@ -164,8 +168,8 @@ class TestPoolAsync(TestPollBase):
         cls.setup = WebSQLSetupAsync()
 
     def setUp(self):
-        provider = pool.ConnectionProviderAsync([self.setup.connect_kwargs], DummyLogger, loop=self.setup.loop)
-        self.pool = pool.ConnectionPoolAsync(provider, self.pool_size, timeout=self.timeout, loop=self.setup.loop)
+        provider = ConnectionProvider([self.setup.connect_kwargs], DummyLogger, loop=self.setup.loop, nonblocking=True)
+        self.pool = ConnectionPool(provider, self.pool_size, timeout=self.timeout, loop=self.setup.loop, nonblocking=True)
 
 
 del TestPollBase

@@ -1,4 +1,9 @@
-# @copyright (c) 2002-2015 Acronis International GmbH. All rights reserved.
-# since    $Id: $
+"""
+WebSQL Connection Fabrics
+-------------------
 
-__author__ = "Bulat Gaifullin (bulat.gaifullin@acronis.com)"
+This module implements pool of connections and connection providers
+"""
+
+from .pool import *
+from .provider import *
