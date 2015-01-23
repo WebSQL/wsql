@@ -32,6 +32,11 @@ class WebSQLSetupBase:
 
 
 class WebSQLSetup(WebSQLSetupBase):
+    @staticmethod
+    def decorator(func):
+        """function decorate policy"""
+        return func
+
     def connect(self):
         """
         :return: new connection to database
@@ -100,6 +105,10 @@ class WebSQLSetupAsync(WebSQLSetupBase):
         self.loop = loop
         self.loop.set_debug(self.debug)
 
+    @staticmethod
+    def decorator(func):
+        return asyncio.coroutine(func)
+
     def clean(self):
         """
         clean context after complete work
@@ -117,7 +126,7 @@ class WebSQLSetupAsync(WebSQLSetupBase):
 
     def wait(self, obj):
         """
-        :param ref: Future or coroutine
+        :param obj: Future or coroutine
         :return: the real value
         """
         if isinstance(obj, asyncio.Future) or asyncio.iscoroutine(obj):

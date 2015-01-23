@@ -79,7 +79,7 @@ class CapabilityTestCases(DatabaseTestCase):
     def test_tiny_int(self):
         """test TINYINT"""
         def generator(row, col):
-            v = (row * col) % 256
+            v = (row * col) * 20 % 256
             if v > 127:
                 v -= 256
             return v

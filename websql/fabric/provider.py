@@ -53,12 +53,17 @@ class ConnectionHolder:
         self._connection = connection
         self._meta = meta
 
-    @property
     def connection(self):
         """
         :return: the native connection
         """
         return self._connection
+
+    def cursor(self):
+        """
+        :return: the native cursor
+        """
+        return self._connection.cursor()
 
     @property
     def closed(self):
@@ -81,6 +86,14 @@ class ConnectionHolder:
         :return the result of handler
         """
         return handler(self)
+
+    def commit(self):
+        """apply changes"""
+        return self._connection.commit()
+
+    def rollback(self):
+        """rollback changes"""
+        return self._connection.rollback()
 
 
 class _ConnectionProviderBase:
