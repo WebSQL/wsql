@@ -1,7 +1,5 @@
 recursive-include doc *.txt
 include MANIFEST.in
 include MANIFEST
-include ChangeLog
 include HISTORY
-include GPL
 recursive-include tests *.py
