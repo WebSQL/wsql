@@ -128,6 +128,7 @@ def any_to_sql(connection, obj):
 
 
 def none_if_null(func):
+    """decorator, call function only if value is not None, otherwise return None"""
     def _none_if_null(value):
         return value if value is None else func(value)
     _none_if_null.__name__ = func.__name__ + "_or_None_if_NULL"
@@ -199,6 +200,7 @@ simple_field_decoders = {
 
 
 def default_decoder(*_):
+    """by default, convert to bytes"""
     return bytes_or_None_if_NULL
 
 
@@ -218,10 +220,12 @@ def default_encoder(_, value):
 
 
 def simple_decoder(_, field):
+    """convert according to predefined rules"""
     return simple_field_decoders.get(field.type, None)
 
 
 def simple_encoder(_, value):
+    """convert according to predefined rules"""
     return simple_type_encoders.get(type(value), None)
 
 
@@ -235,6 +239,7 @@ character_types = {
 
 
 def character_decoder(connection, field):
+    """convert value of mysql string type to python associated python type"""
     if field.type not in character_types:
         return None
 
@@ -265,6 +270,13 @@ default_encoders = [
 
 
 def get_codec(connection, field, codecs):
+    """
+    select codec
+    :param connection: the connection object
+    :param field: the value to convert
+    :param codecs: the list of codecs
+    :return:
+    """
     for c in codecs:
         func = c(connection, field)
         if func:
@@ -273,12 +285,14 @@ def get_codec(connection, field, codecs):
 
 
 def iter_row_decoder(decoders, row):
+    """convert mysql row to iterable object"""
     if row is None:
         return None
     return (d(col) for d, col in zip(decoders, row))
 
 
 def tuple_row_decoder(decoders, row):
+    """convert mysql row to tuple"""
     if row is None:
         return None
     return tuple(iter_row_decoder(decoders, row))

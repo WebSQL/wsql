@@ -2,7 +2,7 @@
 WebSQL
 =======
 An asynchronous DB API v2.0 compatible interface to MySQL
--------------------------------------------
+---------------------------------------------------------
 
 This package is a wrapper around _websql, which mostly implements the MySQL C API.
 

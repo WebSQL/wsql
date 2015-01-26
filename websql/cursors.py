@@ -1,6 +1,6 @@
 """
 WebSQL Cursors
----------------
+--------------
 
 This module implements the Cursor classes. You should not try to
 create Cursors directly; use connection.cursor() instead.
@@ -33,6 +33,12 @@ class CursorBase:
     NotSupportedError = _websql.exceptions.NotSupportedError
 
     def __init__(self, connection, encoders, decoders, row_formatter):
+        """
+        :param connection: the connection object
+        :param encoders: the python object encoders
+        :param decoders: the mysql field decoders
+        :param row_formatter: the formatter to format mysql-row
+        """
         self.messages = []
         self.encoders = encoders
         self.decoders = decoders
@@ -50,6 +56,7 @@ class CursorBase:
             warn(ResourceWarning("unclosed %r" % self))
 
     def errorhandler(self, error):
+        """default error handler"""
         self.messages.append((type(error), str(error)))
         raise error
 
@@ -59,6 +66,11 @@ class CursorBase:
             self.errorhandler(self.ProgrammingError("there is no result"))
 
     def _acquire_result(self, connection):
+        """
+        read mysql result and construct accosiated objects
+        :param connection: mysql connection
+        """
+
         result = connection.get_result(self._use_result)
         if result is not None:
             decoders = self.decoders
@@ -68,6 +80,10 @@ class CursorBase:
             return True
 
     def _release_result(self):
+        """
+        destroy mysql result
+        """
+
         result = self._result
         self._result = None
         self._rowcount = -1
@@ -95,6 +111,10 @@ class CursorBase:
 
     @property
     def description(self):
+        """
+        This read-only attribute is a sequence of 7-item sequences.
+        Each of these sequences contains information describing one result column.
+        """
         if self._result:
             return self._result.description
         return None
@@ -140,13 +160,16 @@ class Cursor(CursorBase):
     _use_result = False
 
     def __enter__(self):
+        """context manager"""
         return self
 
     def __exit__(self, *_):
+        """context manager"""
         self.close()
         return False
 
     def _free_result(self):
+        """release current result and free all resources"""
         result = self._release_result()
         if result is None:
             return
@@ -198,9 +221,9 @@ class Cursor(CursorBase):
         Execute a query.
         :param query: string, query to execute on server
         :param args: optional sequence or mapping, parameters to use with query.
-                     Note: If args is a sequence, then %s must be used as the
-                     parameter placeholder in the query. If a mapping is used,
-                     %(key)s must be used as the placeholder.
+        Note! If args is a sequence, then %s must be used as the
+        parameter placeholder in the query. If a mapping is used,
+        %(key)s must be used as the placeholder.
         """
         try:
             connection = self.connection
@@ -299,6 +322,7 @@ class Cursor(CursorBase):
             self.errorhandler(e)
 
     def __iter__(self):
+        """Iterable object protocol"""
         return iter(self.fetchone, None)
 
     def _query(self, connection, query):
@@ -350,6 +374,8 @@ class Cursor(CursorBase):
 
 
 class CursorAsync(CursorBase):
+    """Asynchronous cursor implementation"""
+
     NET_ASYNC_COMPLETE = _websql.constants.NET_ASYNC_COMPLETE
     _use_result = True
 
@@ -362,11 +388,13 @@ class CursorAsync(CursorBase):
 
     @property
     def rowcount(self):
+        """number of row in current result, always return -1"""
         # there is no way to get number of rows from async result
         return -1
 
     @asyncio.coroutine
     def _free_result(self):
+        """free all resources associated with current result"""
         result = super()._release_result()
         if result is not None:
             connection = self.connection
@@ -381,6 +409,7 @@ class CursorAsync(CursorBase):
 
     @asyncio.coroutine
     def close(self):
+        """close cursor and free resources"""
         connection = self._connection()
         if connection:
             while (yield from self.nextset()):
@@ -417,11 +446,11 @@ class CursorAsync(CursorBase):
     def execute(self, query, args=None):
         """
         Execute a query.
-        :param query: string, query to execute on server
+        :param query: query to execute on server
         :param args: optional sequence or mapping, parameters to use with query.
-                     Note: If args is a sequence, then %s must be used as the
-                     parameter placeholder in the query. If a mapping is used,
-                     %(key)s must be used as the placeholder.
+        Note! If args is a sequence, then %s must be used as the
+        parameter placeholder in the query. If a mapping is used,
+        %(key)s must be used as the placeholder.
         """
 
         try:
@@ -445,13 +474,13 @@ class CursorAsync(CursorBase):
     def executemany(self, query, args):
         """
         Execute a multi-row query.
-        This method improves performance on multiple-row INSERT and
-        REPLACE. Otherwise it is equivalent to looping over args with
-        execute().
+        This method improves performance on multiple-row INSERT and REPLACE.
+        Otherwise it is equivalent to looping over args with execute().
 
-        :param query: string, query to execute on server
+        :param query: query to execute on server
         :param args: Sequence of sequences or mappings, parameters to use with query.
         """
+
         if not args:
             return
 

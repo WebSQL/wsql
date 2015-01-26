@@ -1,6 +1,6 @@
 """
 WebSQL types
--------------------
+------------
 
 This module implements connections for MySQLdb. Presently there is
 only one class: Connection. Others are unlikely. However, you might

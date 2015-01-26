@@ -1,6 +1,6 @@
 """
 WebSQL Connections
--------------------
+------------------
 
 This module implements connections for WebSQL.
 You should not try to
@@ -8,7 +8,6 @@ create Connection directly; use connect method instead.
 """
 
 __author = "@bg"
-
 from .converters import default_decoders, default_encoders, default_row_formatter
 import _websql
 import asyncio
@@ -37,7 +36,7 @@ def connect(*args, nonblocking=None, **kwargs):
     you only use keyword parameters. Consult the MySQL C API documentation
     for more information.
 
-    :param host: host to connect
+    :param host: the hostname
     :type host: str
     :param user: user to connect as
     :type user: str
@@ -90,7 +89,6 @@ def connect(*args, nonblocking=None, **kwargs):
                         If this is set, and client does not support non-blocking, NotSupportedError will be raised.
     :type nonblocking: bool
     :return: new coroutine in nonblocking mode and connection otherwise
-    :rtype: coroutine|Connection
     """
 
     if nonblocking:
@@ -100,7 +98,10 @@ def connect(*args, nonblocking=None, **kwargs):
 
 @asyncio.coroutine
 def connection_promise(*args, sql_mode=None, charset=None, **kwargs):
-    """Factory function for asynchronous connections.Connection."""
+    """
+    Factory function for asynchronous connections.Connection.
+    for details see connect
+    """
 
     connection = ConnectionAsync(*args, **kwargs)
     yield from connection.start()
@@ -109,6 +110,9 @@ def connection_promise(*args, sql_mode=None, charset=None, **kwargs):
 
 
 class ConnectionBase(object):
+    """
+    Base class for connection implementations
+    """
     Error = _websql.exceptions.Error
     InterfaceError = _websql.exceptions.InterfaceError
     DatabaseError = _websql.exceptions.DatabaseError
@@ -127,6 +131,15 @@ class ConnectionBase(object):
                  decoders=None,
                  row_formatter=None,
                  client_flag=None, **kwargs):
+        """
+        :param cursorclass: the cursor class
+        :param args: connection args, for details see connect
+        :param encoders: the list of functions to convert from python to sql
+        :param decoders: the list of functions to convert from sql to python
+        :param row_formatter: the function to format row
+        :param client_flag: the flags of client, for details see connect
+        :param kwargs: connection keyword arguments, for details see connect
+        """
 
         self.cursorclass = cursorclass
         self.encoders = default_encoders if encoders is None else encoders
@@ -147,24 +160,32 @@ class ConnectionBase(object):
         weakref.finalize(self, lambda db: db.closed or db.close(), db=self._db)
 
     def __getattr__(self, item):
+        """get attribute"""
         return getattr(self._db, item)
 
     def cursor(self):
+        encoders = self.encoders
         """
             Create a cursor instance of cursorclass on which queries may be performed.
             :return the new cursor object
             :rtype cursorclass
         """
-        encoders = self.encoders
         decoders = self.decoders
         row_formatter = self.row_formatter
         return self.cursorclass(self, encoders, decoders, row_formatter)
 
 
 class Connection(ConnectionBase):
-    """MySQL Database Connection Object"""
+    """The Synchronous Connection Implementation"""
 
     def __init__(self, *args, charset=None, sql_mode=None, **kwargs):
+        """
+        :param args: connection args, for details see connect
+        :param charset: the connection charset
+        :param sql_mode: the connection mode
+        :param kwargs: connection keyword arguments, for details see connect
+        """
+
         from .cursors import Cursor
         super().__init__(Cursor, *args, **kwargs)
 
@@ -177,9 +198,11 @@ class Connection(ConnectionBase):
         self._server_version = tuple(int(n) for n in self._db.server_info.split('.')[:2])
 
     def __enter__(self):
+        """context object method"""
         return self.cursor()
 
     def __exit__(self, exc, *_):
+        """context object method"""
         if exc:
             self.rollback()
         else:
@@ -225,6 +248,8 @@ class Connection(ConnectionBase):
 
 
 class ConnectionAsync(ConnectionBase):
+    """The asynchronous connection implementation"""
+
     _Future = asyncio.Future
     NET_ASYNC_WRITE = _websql.constants.NET_ASYNC_WRITE
     NET_ASYNC_READ = _websql.constants.NET_ASYNC_READ
@@ -233,6 +258,11 @@ class ConnectionAsync(ConnectionBase):
     NET_ASYNC_NOT_READY = _websql.constants.NET_ASYNC_NOT_READY
 
     def __init__(self, *args, loop=None, **kwargs):
+        """
+        :param args: connection args, for details see connect
+        :param loop: the event loop, Optional, by default the current loop will be used
+        :param kwargs: connection keyword arguments, for details see connect
+        """
         from .cursors import CursorAsync
         super().__init__(CursorAsync, *args, nonblocking=True, **kwargs)
         self._loop = asyncio.get_event_loop() if loop is None else loop
