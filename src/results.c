@@ -332,11 +332,6 @@ _mysql_result_object_row_seek(
         return NULL;
     };
 
-    if (r >= mysql_num_rows(self->result)) {
-        PyErr_SetString(PyExc_IndexError, "offset overflow");
-        return NULL;
-    }
-
     mysql_row_seek(self->result, r);
     Py_RETURN_NONE;
 }

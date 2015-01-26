@@ -1,11 +1,13 @@
 """
 WebSQL Connection Pool
--------------------
+----------------------
 
 This module implements connections pools for WebSQL.
 """
 
+from .functional import nonblocking as _nonblocking
 from asyncio import coroutine, wait_for
+
 
 __all__ = ["ConnectionPool"]
 
@@ -30,6 +32,7 @@ class _ConnectionPoolBase:
     """
         Base class for connection pools
     """
+
     def __init__(self, provider, queue, timeout=None):
         """
         Constructor
@@ -52,18 +55,20 @@ class _ConnectionPoolBase:
         put back a connection to free connections queue if connection is valid
         :param connection: connection object
         """
-        if connection.closed:
+        if connection.connected:
+            self._queue.put_nowait(connection)
+        else:
             self._reserve += 1
             self._provider.invalidate(connection)
-        else:
-            self._queue.put_nowait(connection)
 
 
+@_nonblocking
 class ConnectionPoolAsync(_ConnectionPoolBase):
     """
         Asynchronous connection pool
         the connections will be created on demand
     """
+
     def __init__(self, provider, size, loop=None, timeout=None):
         """
         Initialize pool
@@ -105,7 +110,7 @@ class ConnectionPoolAsync(_ConnectionPoolBase):
         """
         connection = yield from self._acquire()
         try:
-            return handler(connection)
+            return (yield from connection.execute(handler))
         finally:
             self._release(connection)
 

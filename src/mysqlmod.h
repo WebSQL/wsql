@@ -37,6 +37,7 @@ typedef struct {
     MYSQL connection;
     int open;
     int autocommit;
+    int connected;
 } _mysql_connection_object;
 
 extern PyTypeObject _mysql_connection_object_t;

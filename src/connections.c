@@ -32,6 +32,7 @@ _mysql_connection_object__init__(
 
     self->open = 0;
     self->autocommit = 0;
+    self->connected = 0;
     CHECK_SERVER(-1);
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|ssssIsIisssIOii:connect",
@@ -118,6 +119,7 @@ _mysql_connection_object__init__(
     }
 
     self->open = 1;
+    self->connected = 1;
     return 0;
 }
 
@@ -262,6 +264,7 @@ _mysql_connection_object_close(
         mysql_close(&(self->connection));
         Py_END_ALLOW_THREADS
         self->open = 0;
+        self->connected = 0;
     } else {
         PyErr_SetString(_mysql_programming_error, "closing a closed connection");
         return NULL;
@@ -1343,6 +1346,14 @@ static PyMemberDef _mysql_connection_object_members[] = {
          READONLY,
          "Client flags; refer to MySQLdb.constants.CLIENT"
     },
+    {
+         "connected",
+         T_INT,
+         offsetof(_mysql_connection_object, connected),
+         READONLY,
+         "if true, connection was lost and reconnect is required."
+    },
+
     {NULL} /* Sentinel */
 };
 

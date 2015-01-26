@@ -228,7 +228,7 @@ class CapabilityTestCases(DatabaseTestCase):
         try:
             cursor.execute("describe some_non_existent_table")
         except self._context.module.ProgrammingError as e:
-            self.assertEqual(self._context.constants.ER_NO_SUCH_TABLE, e.args[0])
+            self.assertEqual(self._context.constants.ER_NO_SUCH_TABLE, e.code)
         else:
             self.fail('ProgrammingError should be raised!')
 

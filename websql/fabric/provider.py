@@ -1,14 +1,16 @@
 """
 WebSQL Connection Provider
--------------------
+--------------------------
 
 This module implements connections pools for WebSQL.
 """
 
+from .functional import nonblocking as _nonblocking
 from asyncio import coroutine
 from time import monotonic
 import websql
 import sys
+
 
 __all__ = ["ConnectionProvider"]
 
@@ -61,24 +63,49 @@ class ConnectionHolder:
 
     def cursor(self):
         """
-        :return: the native cursor
+        an alias for connection.cursor()
         """
         return self._connection.cursor()
 
     @property
-    def closed(self):
+    def connected(self):
         """
-        :return: the connection state
+        an alias for connection.invalid
         """
-        return self._connection.closed
+        return self._connection.connected
 
     @property
     def meta(self):
         """
+        get the meta information associated with this connection
         :return: connection meta information
         """
         return self._meta
 
+
+@_nonblocking
+class ConnectionHolderAsync(ConnectionHolder):
+    @coroutine
+    def execute(self, handler):
+        """
+        execute the database query
+        :param handler: - the callable object, that implement logic to query database
+        :return the result of handler
+        """
+        return (yield from handler(self))
+
+    @coroutine
+    def commit(self):
+        """an alias for connection.commit()"""
+        return (yield from self._connection.commit())
+
+    @coroutine
+    def rollback(self):
+        """an alias for connection.rollback()"""
+        return (yield from self._connection.rollback())
+
+
+class ConnectionHolderSync(ConnectionHolder):
     def execute(self, handler):
         """
         execute the database query
@@ -88,11 +115,11 @@ class ConnectionHolder:
         return handler(self)
 
     def commit(self):
-        """apply changes"""
+        """an alias for connection.commit()"""
         return self._connection.commit()
 
     def rollback(self):
-        """rollback changes"""
+        """an alias for connection.rollback()"""
         return self._connection.rollback()
 
 
@@ -111,16 +138,6 @@ class _ConnectionProviderBase:
         self.current = 0
         self.max = len(servers)
         self.penalty = 60  # 1 min
-
-    @staticmethod
-    def make_connection(connection, info):
-        """
-        Attach meta info to connection
-        :param connection: the connection object
-        :param info: the server info
-        :return: the connection object
-        """
-        return ConnectionHolder(connection, info)
 
     def invalidate(self, connection, e=None):
         """
@@ -143,10 +160,12 @@ class _ConnectionProviderBase:
         self._logger.error('Connection to server %s closed: %s.', connection, e)
 
 
+@_nonblocking
 class ConnectionProviderAsync(_ConnectionProviderBase):
     """
     The asynchronous variant of ConnectionProvider
     """
+
     def __init__(self, servers, logger, loop=None):
         """
         Constructor
@@ -156,6 +175,16 @@ class ConnectionProviderAsync(_ConnectionProviderBase):
         """
         super().__init__(servers, logger)
         self._loop = loop
+
+    @staticmethod
+    def make_connection(connection, info):
+        """
+        Attach meta info to connection
+        :param connection: the connection object
+        :param info: the server info
+        :return: the connection object
+        """
+        return ConnectionHolderAsync(connection, info)
 
     @coroutine
     def connect(self):
@@ -181,6 +210,16 @@ class ConnectionProviderSync(_ConnectionProviderBase):
     """
     The synchronous variant of ConnectionProvider
     """
+
+    @staticmethod
+    def make_connection(connection, info):
+        """
+        Attach meta info to connection
+        :param connection: the connection object
+        :param info: the server info
+        :return: the connection object
+        """
+        return ConnectionHolderSync(connection, info)
 
     def connect(self):
         """

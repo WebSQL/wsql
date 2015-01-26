@@ -13,52 +13,115 @@ PyObject *_mysql_programming_error;
 PyObject *_mysql_not_supported_error;
 PyObject *_mysql_error_map;
 
-PyObject *
-_mysql_exception(_mysql_connection_object *c)
+bool is_connection_lost(error_code)
 {
-    PyObject *error_value, *error_class;
-    int error_code;
+    switch (error_code)
+    {
+    case CR_SERVER_GONE_ERROR:
+    case CR_SERVER_LOST:
+        return true;
+    default:
+        return false;
+    }
+}
 
-    if (!(error_value = PyTuple_New(2)))
-        return NULL;
+bool is_retryable_error(error_code)
+{
+    /// connection error
+    if (error_code >= CR_SOCKET_CREATE_ERROR && error_code <= CR_SERVER_GONE_ERROR)
+        return true;
+    /// lost connection or dead-lock
+    if (error_code == CR_SERVER_LOST || error_code == ER_LOCK_DEADLOCK)
+        return true;
 
-    if (!_mysql_server_init_done || !c) {
-        error_class = _mysql_internal_error;
-        PyTuple_SET_ITEM(error_value, 0, PyLong_FromLong(-1L));
-        PyTuple_SET_ITEM(error_value, 1, PyString_FromString("server not initialized"));
-        PyErr_SetObject(error_class, error_value);
-        Py_DECREF(error_value);
-        return NULL;
+    return false;
+}
+
+PyObject*
+_mysql_set_exception(PyObject* cls, int code, const char* message)
+{
+    PyObject *py_code = PyLong_FromLong(code);
+    PyObject *py_message = PyString_FromString(message);
+    if (cls == NULL) {
+        cls = PyDict_GetItem(_mysql_error_map, py_code);
+        if (!cls)
+            cls = code < ER_ERROR_FIRST ? _mysql_internal_error : _mysql_operational_error;
     }
 
-    error_code = mysql_errno(&(c->connection));
-    if (!error_code) {
-        error_class = _mysql_interface_error;
+    PyObject* exc = PyObject_CallFunction(cls, "OO", py_code, py_message);
+    if (exc) {
+        PyObject_SetAttrString(exc, "code", py_code);
+        PyObject_SetAttrString(exc, "message", py_message);
+        PyErr_SetObject(cls, exc);
     }
-    else if (error_code > CR_MAX_ERROR) {
-        PyTuple_SET_ITEM(error_value, 0, PyLong_FromLong(-1L));
-        PyTuple_SET_ITEM(error_value, 1, PyString_FromString("error totally whack"));
-        PyErr_SetObject(_mysql_interface_error, error_value);
-        Py_DECREF(error_value);
-        return NULL;
-    }
-    else {
-        PyObject *py_error = PyLong_FromLong(error_code);
-        error_class = PyDict_GetItem(_mysql_error_map, py_error);
-        Py_DECREF(py_error);
-        if (!error_class)
-            error_class = error_code < ER_ERROR_FIRST ? _mysql_internal_error : _mysql_operational_error;
-    }
-    TRACE2("%p, %d", c, error_code);
-    PyTuple_SET_ITEM(error_value, 0, PyLong_FromLong((long)error_code));
-    PyTuple_SET_ITEM(error_value, 1, PyString_FromString(mysql_error(&(c->connection))));
-    PyErr_SetObject(error_class, error_value);
-    Py_DECREF(error_value);
+    Py_XDECREF(py_code);
+    Py_XDECREF(py_message);
     return NULL;
 }
 
+PyObject*
+_mysql_exception(_mysql_connection_object *c)
+{
+    PyObject *error_class;
+    int error_code;
+
+    if (!_mysql_server_init_done || !c) {
+        error_class = _mysql_internal_error;
+        return _mysql_set_exception(_mysql_internal_error, -1, "server not initialized");
+    }
+
+    error_code = mysql_errno(&(c->connection));
+
+    TRACE2("%p, %d", c, error_code);
+    if (is_connection_lost(error_code)) {
+        c->connected = 0;
+    }
+
+    if (!error_code) {
+        return _mysql_set_exception(_mysql_interface_error, -1, "unknown error");
+    }
+
+    if (error_code > CR_MAX_ERROR) {
+        return _mysql_set_exception(_mysql_interface_error, -1, "error totally whack");
+    }
+
+    return _mysql_set_exception(NULL, error_code, mysql_error(&(c->connection)));
+}
+
+const char _mysql_is_retryable_error__doc__[] =
+"Return True if error is retryable, otherwise False\n";
+
+PyObject *
+_mysql_is_retryable_error(PyObject* self, PyObject* args)
+{
+    int result = 0;
+    PyObject* exc;
+
+    if (!PyArg_ParseTuple(args, "O", &exc))
+        return NULL;
+
+    if (PyObject_IsInstance(exc, _mysql_error)) {
+        PyObject* code = PyObject_GetAttrString(exc, "code");
+        if (code && is_retryable_error(PyLong_AsLong(code)))
+            result = 1;
+    }
+    return PyBool_FromLong(result);
+}
+
+
 const char _mysql_exceptions__doc__[] =
 "All Exceptions according to DB API 2.0\n";
+
+static PyMethodDef
+_mysql_exceptions_methods[] = {
+    {
+        "is_retryable",
+        (PyCFunction)_mysql_is_retryable_error,
+        METH_VARARGS,
+        _mysql_is_retryable_error__doc__
+    },
+    {NULL, NULL} /* sentinel */
+};
 
 #ifdef PY3K
 PyModuleDef _mysql_exceptions_module =
@@ -68,7 +131,8 @@ PyModuleDef _mysql_exceptions_module =
     _mysql_exceptions__doc__,             /* module documentation, may be NULL */
     -1,                                   /* size of per-interpreter state of the module,
                                              or -1 if the module keeps state in global variables. */
-    NULL, NULL, NULL, NULL, NULL
+    _mysql_exceptions_methods,
+    NULL, NULL, NULL, NULL
 };
 #endif  // PY3K
 
@@ -92,7 +156,7 @@ _mysql_exceptions_add(PyObject* module)
 #ifdef PY3K
     exceptions = PyModule_Create(&_mysql_exceptions_module);
 #else
-    exceptions = Py_InitModule3(STRINGIFY(MODULE_NAME) ".exceptions", NULL, _mysql_exceptions__doc__);
+    exceptions = Py_InitModule3(STRINGIFY(MODULE_NAME) ".exceptions", _mysql_exceptions_methods, _mysql_exceptions__doc__);
 #endif
     if (!exceptions)
         return -1;

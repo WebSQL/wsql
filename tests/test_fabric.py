@@ -6,8 +6,8 @@ __author__ = "@bg"
 from tests.case import DatabaseTestCase
 from tests.websql_context import WebSQLSetup, WebSQLSetupAsync, WebSQLContextBase
 from unittest import TestCase
-from websql.fabric import ConnectionPool, ConnectionProvider, transaction
-from websql.fabric.provider import ServerInfo, ConnectionHolder
+from websql.fabric import ConnectionPool, ConnectionProvider, transaction, retryable
+from websql.fabric.provider import ServerInfo, ConnectionHolderAsync, ConnectionHolderSync
 
 
 class DummyLogger:
@@ -24,206 +24,29 @@ class TestServerInfo(TestCase):
         self.assertEqual('/var/tmp/socket.sock', str(srv_info))
 
 
-class TestProviderBase(TestCase):
-    setup = None
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.setup.clean()
-        cls.setup = None
-
-    def test_connect(self):
-        """test connect method of ConnectionProvider"""
-        kwargs2 = self.setup.connect_kwargs.copy()
-        kwargs2['port'] = 1
-        provider = self.make_provider([kwargs2, self.setup.connect_kwargs])
-        connection = self.setup.wait(provider.connect())
-        connection2 = self.setup.wait(provider.connect())
-        self.assertIs(self.setup.connect_kwargs, connection.meta.kwargs)
-        self.assertIs(self.setup.connect_kwargs, connection2.meta.kwargs)
-        self.assertGreater(provider._servers[0].penalty, 0)
-
-    def test_no_connections(self):
-        """test case when there is no online servers more"""
-        kwargs2 = self.setup.connect_kwargs.copy()
-        kwargs2['port'] = 1
-        provider = self.make_provider([kwargs2])
-        self.assertRaises(RuntimeError, lambda: self.setup.wait(provider.connect()))
-
-    def test_invalidate(self):
-        """test invalidate method of ConnectionProvider"""
-        provider = self.make_provider([self.setup.connect_kwargs])
-        connection = self.setup.wait(provider.connect())
-        provider.invalidate(connection)
-        self.assertGreater(connection.meta.penalty, 0)
-        connection.meta.penalty = 0
-        provider.invalidate(connection.meta)
-        self.assertGreater(connection.meta.penalty, 0)
-        self.assertGreater(provider._servers[0].penalty, 0)
-        self.assertRaises(ValueError, provider.invalidate, 1)
-
+class TestFabric(DatabaseTestCase):
     def make_provider(self, servers):
         """abstract method to create a new provider"""
         raise NotImplementedError
 
+    def make_pool(self, provider, size, timeout):
+        """abstract method to create connection pool"""
+        raise NotImplementedError
 
-class TestProvider(TestProviderBase):
-    @classmethod
-    def setUpClass(cls):
-        cls.setup = WebSQLSetup()
-
-    def make_provider(self, servers):
-        """abstract method to create a new provider"""
-        return ConnectionProvider(servers, DummyLogger, nonblocking=False)
-
-
-class TestProviderAsync(TestProviderBase):
-    @classmethod
-    def setUpClass(cls):
-        cls.setup = WebSQLSetupAsync()
-
-    def make_provider(self, servers):
-        """abstract method to create a new provider"""
-        return ConnectionProvider(servers, DummyLogger, loop=self.setup.loop, nonblocking=True)
-
-del TestProviderBase
-
-
-class TestPollBase(TestCase):
-    pool_size = 3
-    timeout = 1
-    setup = None
-    pool = None
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.setup.clean()
-        cls.setup = None
-
-    def tearDown(self):
-        self.pool = None
-
-    def test_acquire(self):
-        """test _acquire method of ConnectionPoolAsync"""
-        connections = []
-        for i in range(self.pool_size):
-            connection = self.setup.wait(self.pool._acquire())
-            self.assertIsNotNone(connection)
-            connections.append(connection)
-            self.assertEqual(self.pool_size - i - 1, self.pool._reserve)
-        self.assertEqual(self.pool_size, len(connections))
-
-    def test_release(self):
-        """test _release method of ConnectionPoolAsync"""
-        connection = self.setup.wait(self.pool._acquire())
-        self.assertIsNotNone(connection)
-        self.assertEqual(0, self.pool._queue.qsize())
-        self.pool._release(connection)
-        self.assertEqual(1, self.pool._queue.qsize())
-
-    def test_release_closed_connection(self):
-        """test _release method of ConnectionPoolAsync in case if connection closed"""
-        connection = self.setup.wait(self.pool._acquire())
-        self.assertIsNotNone(connection)
-        self.assertEqual(0, self.pool._queue.qsize())
-        connection.connection().close()
-        self.pool._release(connection)
-        self.assertEqual(0, self.pool._queue.qsize())
-        self.assertEqual(self.pool_size, self.pool._reserve)
-
-    def test_acquire_if_no_free(self):
-        """test _acquire method of ConnectionPoolAsync if there is no free connections"""
-        connections = []
-        for i in range(self.pool_size):
-            connection = self.setup.wait(self.pool._acquire())
-            self.assertIsNotNone(connection)
-            connections.append(connection)
-            self.assertEqual(self.pool_size - i - 1, self.pool._reserve)
-        self.assertEqual(0, self.pool._reserve)
-        self.assertTrue(self.pool._queue.empty())
-        self.assertRaises(self.pool.TimeoutError, self.setup.call_and_wait, self.pool._acquire)
-
-    def test_execute(self):
-        """test _release method of ConnectionPoolAsync"""
-        connection = self.setup.wait(self.pool.execute(lambda x: x))
-        self.assertIsNotNone(connection)
-
-
-class TestPool(TestPollBase):
-    @classmethod
-    def setUpClass(cls):
-        cls.setup = WebSQLSetup()
-
-    def setUp(self):
-        provider = ConnectionProvider([self.setup.connect_kwargs], DummyLogger, nonblocking=False)
-        self.pool = ConnectionPool(provider, self.pool_size, timeout=self.timeout, nonblocking=False)
-
-
-class TestPoolAsync(TestPollBase):
-    @classmethod
-    def setUpClass(cls):
-        cls.setup = WebSQLSetupAsync()
-
-    def setUp(self):
-        provider = ConnectionProvider([self.setup.connect_kwargs], DummyLogger, loop=self.setup.loop, nonblocking=True)
-        self.pool = ConnectionPool(provider, self.pool_size, timeout=self.timeout, loop=self.setup.loop, nonblocking=True)
-
-
-del TestPollBase
-
-
-class TestTransactionScopeBase(DatabaseTestCase):
-    def count_calls(self, func):
-        def wrapper(*args, **kwargs):
-            wrapper.call_count += 1
-            return func(*args, **kwargs)
-
-        wrapper.call_count = 0
-        return wrapper
-
-    def test_rollback(self):
-        """test rollback method of TransactionScope"""
-        table = self._create_table(('name VARCHAR(10)',), None)
-
-        connection_holder = ConnectionHolder(self._context.make_connection())
-        handler = self.get_hanlder(table, Exception('rollback expected!'))
-        self.assertRaisesRegex(Exception, 'rollback expected!',
-                               self._context.call_and_wait, connection_holder.execute, transaction(handler))
-
-        cursor = self._context.cursor()
-        self._context.wait(cursor.execute("SELECT * FROM %s" % table))
-        self.assertEqual([], cursor.fetchall())
-
-    def test_commit(self):
-        """test commit method of TransactionScope"""
-        table = self._create_table(('name VARCHAR(10)',), None)
-
-        connection_holder = ConnectionHolder(self._context.make_connection())
-        handler = self.get_hanlder(table)
-        self._context.wait(connection_holder.execute(transaction(handler)))
-
-        cursor = self._context.cursor()
-        self._context.wait(cursor.execute("SELECT * FROM %s" % table))
-        self.assertEqual([('Evelina',)], cursor.fetchall())
-
-    def test_recursive(self):
-        """test get recursive handler"""
-        table = self._create_table(('name VARCHAR(10)',), None)
-
-        connection_holder = ConnectionHolder(self._context.make_connection())
-        handler = self.wrap_handler(transaction(self.get_hanlder(table)))
-
-        connection_holder.commit = self.count_calls(connection_holder.commit)
-        connection_holder.commit.call_count = 0
-        self._context.wait(connection_holder.execute(transaction(handler)))
-        self.assertEqual(1, connection_holder.commit.call_count)
-
-    def get_hanlder(self, table, error=None):
+    def get_insert_handler(self, table, error=None):
         """
         get the query handler
         :param table: the temporary table name
         :param error: error, that should be raised if specified
         :return: the handler, that run query logic
+        """
+        raise NotImplementedError
+
+    def make_connection_holder(self, connection):
+        """
+        Create a new connection holder
+        :param connection: real connection to database
+        :return: the ConnectionHolder
         """
         raise NotImplementedError
 
@@ -235,14 +58,183 @@ class TestTransactionScopeBase(DatabaseTestCase):
         """
         raise NotImplementedError
 
+    def make_retryable(self, connection, retry_count, delay):
+        """create a new retryable connection to database"""
+        raise NotImplementedError
 
-class TestTransactionScope(TestTransactionScopeBase):
+    def make_exception_handler(self, retry_count):
+        """create handler with retry_count"""
+        raise NotImplementedError
+
+    def count_calls(self, func):
+        def wrapper(*args, **kwargs):
+            wrapper.call_count += 1
+            return func(*args, **kwargs)
+
+        wrapper.call_count = 0
+        return wrapper
+
+    def test_connect(self):
+        """test connect method of ConnectionProvider"""
+        kwargs2 = self._context.connect_kwargs.copy()
+        kwargs2['port'] = 1
+        provider = self.make_provider([kwargs2, self._context.connect_kwargs])
+        connection = self._context.wait(provider.connect())
+        connection2 = self._context.wait(provider.connect())
+        self.assertIs(self._context.connect_kwargs, connection.meta.kwargs)
+        self.assertIs(self._context.connect_kwargs, connection2.meta.kwargs)
+        self.assertGreater(provider._servers[0].penalty, 0)
+
+    def test_no_connections(self):
+        """test case when there is no online servers more"""
+        kwargs2 = self._context.connect_kwargs.copy()
+        kwargs2['port'] = 1
+        provider = self.make_provider([kwargs2])
+        self.assertRaises(RuntimeError, lambda: self._context.wait(provider.connect()))
+
+    def test_invalidate(self):
+        """test invalidate method of ConnectionProvider"""
+        provider = self.make_provider([self._context.connect_kwargs])
+        connection = self._context.wait(provider.connect())
+        provider.invalidate(connection)
+        self.assertGreater(connection.meta.penalty, 0)
+        connection.meta.penalty = 0
+        provider.invalidate(connection.meta)
+        self.assertGreater(connection.meta.penalty, 0)
+        self.assertGreater(provider._servers[0].penalty, 0)
+        self.assertRaises(ValueError, provider.invalidate, 1)
+
+    def test_acquire(self):
+        """test _acquire method of ConnectionPoolAsync"""
+        connections = []
+        pool_size = 3
+        timeout = 0.1
+
+        pool = self.make_pool(self.make_provider([self._context.connect_kwargs]), pool_size, timeout)
+
+        for i in range(pool_size):
+            connection = self._context.wait(pool._acquire())
+            self.assertIsNotNone(connection)
+            connections.append(connection)
+            self.assertEqual(pool_size - i - 1, pool._reserve)
+        self.assertEqual(pool_size, len(connections))
+
+    def test_release(self):
+        """test _release method of ConnectionPoolAsync"""
+        pool_size = 3
+        timeout = 0.1
+
+        pool = self.make_pool(self.make_provider([self._context.connect_kwargs]), pool_size, timeout)
+        connection = self._context.wait(pool._acquire())
+        self.assertIsNotNone(connection)
+        self.assertEqual(0, pool._queue.qsize())
+        pool._release(connection)
+        self.assertEqual(1, pool._queue.qsize())
+
+    def test_release_closed_connection(self):
+        """test _release method of ConnectionPoolAsync in case if connection closed"""
+        pool_size = 3
+        timeout = 0.1
+
+        pool = self.make_pool(self.make_provider([self._context.connect_kwargs]), pool_size, timeout)
+        connection = self._context.wait(pool._acquire())
+        self.assertIsNotNone(connection)
+        self.assertEqual(0, pool._queue.qsize())
+        connection.connection().close()
+        pool._release(connection)
+        self.assertEqual(0, pool._queue.qsize())
+        self.assertEqual(pool_size, pool._reserve)
+
+    def test_acquire_if_no_free(self):
+        """test _acquire method of ConnectionPoolAsync if there is no free connections"""
+        connections = []
+        pool_size = 3
+        timeout = 0.1
+
+        pool = self.make_pool(self.make_provider([self._context.connect_kwargs]), pool_size, timeout)
+
+        for i in range(pool_size):
+            connection = self._context.wait(pool._acquire())
+            self.assertIsNotNone(connection)
+            connections.append(connection)
+            self.assertEqual(pool_size - i - 1, pool._reserve)
+        self.assertEqual(0, pool._reserve)
+        self.assertTrue(pool._queue.empty())
+        self.assertRaises(pool.TimeoutError, self._context.call_and_wait, pool._acquire)
+
+    def test_connection_pool_execute(self):
+        """test _release method of ConnectionPoolAsync"""
+        pool_size = 3
+        timeout = 0.1
+        pool = self.make_pool(self.make_provider([self._context.connect_kwargs]), pool_size, timeout)
+        connection = self._context.wait(pool.execute(self._context.decorator(lambda x: x)))
+        self.assertIsNotNone(connection)
+
+    def test_transaction_rollback(self):
+        """test transaction rollback"""
+        table = self._create_table(('name VARCHAR(10)',), None)
+
+        connection_holder = self.make_connection_holder(self._context.make_connection())
+        handler = self.get_insert_handler(table, Exception('rollback expected!'))
+        self.assertRaisesRegex(Exception, 'rollback expected!',
+                               self._context.call_and_wait, connection_holder.execute, transaction(handler))
+
+        cursor = self._context.cursor()
+        self._context.wait(cursor.execute("SELECT * FROM %s" % table))
+        self.assertEqual([], cursor.fetchall())
+
+    def test_commit(self):
+        """test transaction commit"""
+        table = self._create_table(('name VARCHAR(10)',), None)
+
+        connection_holder = self.make_connection_holder(self._context.make_connection())
+        handler = self.get_insert_handler(table)
+        self._context.wait(connection_holder.execute(transaction(handler)))
+
+        cursor = self._context.cursor()
+        self._context.wait(cursor.execute("SELECT * FROM %s" % table))
+        self.assertEqual([('Evelina',)], cursor.fetchall())
+
+    def test_recursive(self):
+        """test recursive transaction"""
+        table = self._create_table(('name VARCHAR(10)',), None)
+
+        connection_holder = self.make_connection_holder(self._context.make_connection())
+        handler = self.wrap_handler(transaction(self.get_insert_handler(table)))
+
+        connection_holder.commit = self.count_calls(connection_holder.commit)
+        connection_holder.commit.call_count = 0
+        self._context.wait(connection_holder.execute(transaction(handler)))
+        self.assertEqual(1, connection_holder.commit.call_count)
+
+    def test_retries(self):
+        """test retries"""
+        retry_count = 3
+        delay = 0.1
+
+        connection = self.make_retryable(self.make_connection_holder(self._context.make_connection()), retry_count, delay)
+        handler = self.make_exception_handler(retry_count - 1)
+        self._context.wait(connection.execute(handler))
+
+        self.assertEqual(retry_count - 1, handler.call_count)
+        handler = self.make_exception_handler(retry_count + 1)
+        self.assertRaises(Exception, self._context.call_and_wait, connection.execute, handler)
+
+
+class TestFabricSync(TestFabric):
     @classmethod
     def get_context(cls):
         return WebSQLContextBase(WebSQLSetup())
 
-    def get_hanlder(self, table, error=None):
-        @self._context.decorator
+    def make_provider(self, servers):
+        """create connection provider"""
+        return ConnectionProvider(servers, DummyLogger, nonblocking=False)
+
+    def make_pool(self, provider, size, timeout):
+        """create connection pool"""
+        return ConnectionPool(provider, size, timeout=timeout, nonblocking=False)
+
+    def get_insert_handler(self, table, error=None):
         def handler(connection):
             cursor = self._context.wrap(connection.cursor())
             try:
@@ -252,7 +244,16 @@ class TestTransactionScope(TestTransactionScopeBase):
 
             if error:
                 raise error
+
         return handler
+
+    def make_connection_holder(self, connection):
+        """
+        Create a new connection holder
+        :param connection: real connection to database
+        :return: the ConnectionHolder
+        """
+        return ConnectionHolderSync(connection)
 
     def wrap_handler(self, handler):
         """
@@ -264,13 +265,35 @@ class TestTransactionScope(TestTransactionScopeBase):
             return handler(connection)
         return wrapper
 
+    def make_exception_handler(self, retry_count):
+        def handler(_):
+            handler.call_count += 1
+            if handler.call_count < retry_count:
+                exc = self._context.errors.Error(self._context.constants.CR_SERVER_LOST, "connection lost")
+                exc.code = self._context.constants.CR_SERVER_LOST
+                raise exc
+            return None
+        handler.call_count = 0
+        return handler
 
-class TestTransactionScopeAsync(TestTransactionScopeBase):
+    def make_retryable(self, connection, retry_count, delay):
+        return retryable(connection, retry_count, delay)
+
+
+class TestFabricAsync(TestFabric):
     @classmethod
     def get_context(cls):
         return WebSQLContextBase(WebSQLSetupAsync())
 
-    def get_hanlder(self, table, error=None):
+    def make_provider(self, servers):
+        """create connection provider"""
+        return ConnectionProvider(servers, DummyLogger, loop=self._context.loop, nonblocking=True)
+
+    def make_pool(self, provider, size, timeout):
+        """create connection pool"""
+        return ConnectionPool(provider, size, timeout=timeout, loop=self._context.loop, nonblocking=True)
+
+    def get_insert_handler(self, table, error=None):
         @self._context.decorator
         def handler(connection):
             cursor = connection.cursor()
@@ -294,5 +317,27 @@ class TestTransactionScopeAsync(TestTransactionScopeBase):
             return (yield from handler(connection))
         return wrapper
 
+    def make_connection_holder(self, connection):
+        """
+        Make connection holder
+        :param connection: real connection to database
+        :return: the ConnectionHolder
+        """
+        return ConnectionHolderAsync(connection)
 
-del TestTransactionScopeBase
+    def make_exception_handler(self, retry_count):
+        @self._context.decorator
+        def handler(_):
+            handler.call_count += 1
+            if handler.call_count < retry_count:
+                exc = self._context.errors.Error(self._context.constants.CR_SERVER_LOST, "connection lost")
+                exc.code = self._context.constants.CR_SERVER_LOST
+                raise exc
+            return None
+        handler.call_count = 0
+        return handler
+
+    def make_retryable(self, connection, retry_count, delay):
+        return retryable(connection, retry_count, delay, loop=self._context.loop)
+
+del TestFabric
