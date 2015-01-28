@@ -37,45 +37,13 @@ def retryable(connection, count=5, delay=1, loop=None):
 
 def transaction(handler):
     """
-    make handler as a single transaction
+    make handler transactional
     :param handler: the handler
     """
-    @coroutine
-    def wrap_coroutine(connection):
-        if _is_transaction_scope(connection):
-            return (yield from handler(connection))
-
-        try:
-            _begin_transaction(connection)
-            r = yield from handler(connection)
-            yield from connection.commit()
-            return r
-        except:
-            if connection.connected:
-                yield from connection.rollback()
-            raise
-        finally:
-            _close_transaction(connection)
-
-    def wrap(connection):
-        if _is_transaction_scope(connection):
-            return handler(connection)
-
-        try:
-            _begin_transaction(connection)
-            r = handler(connection)
-            connection.commit()
-            return r
-        except:
-            if connection.connected:
-                connection.rollback()
-            raise
-        finally:
-            _close_transaction(connection)
 
     if iscoroutinefunction(handler) or iscoroutine(handler):
-        return wrap_coroutine
-    return wrap
+        return _TransactionScopeAsync(handler)
+    return _TransactionScopeSync(handler)
 
 
 def _is_transaction_scope(connection):
@@ -88,6 +56,53 @@ def _begin_transaction(connection):
 
 def _close_transaction(connection):
     setattr(connection, '_transaction_scope', False)
+
+
+class _TransactionScopeAsync:
+    """asynchronous transaction scope"""
+
+    def __init__(self, handler):
+        self._handler = handler
+
+    @coroutine
+    def __call__(self, connection):
+        if _is_transaction_scope(connection):
+            return (yield from self._handler(connection))
+
+        try:
+            _begin_transaction(connection)
+            r = yield from self._handler(connection)
+            yield from connection.commit()
+            return r
+        except:
+            if connection.connected:
+                yield from connection.rollback()
+            raise
+        finally:
+            _close_transaction(connection)
+
+
+class _TransactionScopeSync:
+    """synchronous transaction scope"""
+
+    def __init__(self, handler):
+        self._handler = handler
+
+    def __call__(self, connection):
+        if _is_transaction_scope(connection):
+            return self._handler(connection)
+
+        try:
+            _begin_transaction(connection)
+            r = self._handler(connection)
+            connection.commit()
+            return r
+        except:
+            if connection.connected:
+                connection.rollback()
+            raise
+        finally:
+            _close_transaction(connection)
 
 
 class RetryableAsync:
