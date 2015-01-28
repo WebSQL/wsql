@@ -15,31 +15,47 @@ class BuildWebSQL(_build_ext):
         self.mkpath(temp_dir)
         os.chdir(temp_dir)
         try:
-            self.spawn(['cmake', path, '-DDISABLE_SHARED=on', '-DWITH_PIC=1'])
+            self.spawn(['cmake', path, '-DDISABLE_SHARED=on', '-DWITH_PIC=1', '-DWITH_SSL=yes', '-DWITH_ZLIB=yes'])
             self.spawn(['make'])
         finally:
             os.chdir(pwd)
 
         self.include_dirs.extend([os.path.join(temp_dir, 'include'), os.path.join(path, 'include')])
         self.libraries.append('websqlclient')
-        self.library_dirs.append(os.path.join(temp_dir, 'libmysql'))
 
-        zlib_path = os.path.join(temp_dir, 'zlib')
-        if os.path.exists(zlib_path):
-            self.library_dirs.append(zlib_path)
-            self.libraries.append('zlib')
-
-        ssl_path = os.path.join(temp_dir, 'extra', 'yassl')
-        if os.path.exists(ssl_path):
-            self.library_dirs.extend((ssl_path, os.path.join(ssl_path, 'taocrypt')))
-            self.libraries.extend(('yassl', 'taocrypt'))
-
+        self.add_library_dirs((os.path.join(os.path.join(temp_dir, x) for x in ('libmysql', 'zlib'))))
+        self.add_library_dirs((os.path.join(temp_dir, 'extra', 'yassl', x) for x in ('', 'taocrypt')))
+        self.parse_libraries(os.path.join(temp_dir, 'libmysql', 'libraries.txt'))
         self.extensions[0].depends.append(os.path.join(temp_dir, 'libmysql', 'libwebsqlclient.a'))
         in_file = os.path.join(temp_dir, 'include', 'mysqld_error.h')
         out_file = os.path.join(temp_dir, 'py_mysqld_error.c')
         self.make_er(in_file, out_file)
         self.extensions[0].sources.append(out_file)
         super().run()
+
+    def add_library_dirs(self, paths):
+        for p in paths:
+            if os.path.exists(p):
+                self.library_dirs.append(p)
+
+    def parse_libraries(self, source_file):
+        with open(source_file, 'r') as source:
+            libraries = source.read().split(';')
+
+        for library in libraries:
+            path = os.path.dirname(library)
+            basename = os.path.basename(library)
+            if path:
+                self.library_dirs.append(os.path.abspath(path))
+            if basename:
+                end = basename.rfind('.')
+                if basename.startswith('lib'):
+                    start = 3
+                else:
+                    start = 0
+                if end == -1:
+                    end = None
+                self.libraries.append(basename[start:end])
 
     @staticmethod
     def make_er(in_file, out_file):
@@ -71,9 +87,8 @@ module1 = Extension('_' + __name__,
                              "./src/format.c",
                              "./src/mysqlmod.c",
                              "./src/results.c"],
-                    libraries=['ssl', 'crypto'],
                     extra_compile_args=["-Os", "-g", "-fno-strict-aliasing", "-std=c99"],
-                    extra_link_args=["-lstdc++"] + os.getenv('WEBSQL_EXTRA_LINKER_ARGS', '').split(),
+                    extra_link_args=["-lstdc++"],
                     define_macros=[
                         ("MODULE_NAME", '_' + __name__),
                         ("version_info", "(%d, %d, %d, 'beta', 0)" % tuple(map(int, __version__.split('.')))),
@@ -91,22 +106,21 @@ setup(
         "websql.connections",
         "websql.converters",
         "websql.cursors",
-        "websql.release",
         "websql.times"
     ],
     author="@bg",
     author_email='gaifullinbf@gmail.com',
     maintainer='@bg',
     maintainer_email='gaifullinbf@gmail.com',
-    url='https://github.com/bgaifullin/web-sql',
+    url='https://github.com/WebSQL/websql',
     license='GPL',
     long_description="""\
 =========================
 Asynchronous Python interface for MySQL
 =========================
 \n
-MySQLdb is an asynchronous interface to the popular MySQL_ database server for
-Python.  The design goals are:
+WebSQL is an asynchronous interface to the popular MySQL_ database server for Python based on webscalesql.\n
+The design goals are:
 \n
 - Compatibility with Python3 asyncio package
 \n
@@ -118,10 +132,9 @@ Python.  The design goals are:
 \n
 - Thread-friendliness (threads will not block each other)
 \n
-MySQL-3.23 through 5.1 and Python-2.3 through 2.5 are currently
-supported.
+MySQL-5.5 and newer and Python-3.4 and newer are currently supported.
 \n
-MySQLdb is `Free Software`_.
+WebSQL is `Free Software`_.
 \n
 .. _MySQL: http://www.mysql.com/
 .. _`Free Software`: http://www.gnu.org/
