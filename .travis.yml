@@ -3,7 +3,7 @@ python:
   - "3.4"
 
 env:
- - WEBSQL_TEST_DATABASE=websql_test WEBSQL_TEST_USER=root
+ - WEBSQL_TEST_DATABASE=websql_test WEBSQL_TEST_USER=root CI_BUILD=1
 
 before_install:
   - pip install coveralls coverage

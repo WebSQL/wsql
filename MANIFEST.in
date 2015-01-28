@@ -1,5 +1,7 @@
-recursive-include doc *.txt
+recursive-include doc *
 include MANIFEST.in
 include MANIFEST
 include HISTORY
 recursive-include tests *.py
+recursive-include extra *
+recursive-include src *.h

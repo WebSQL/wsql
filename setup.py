@@ -1,37 +1,152 @@
 #!/usr/bin/env python
 
-from distutils import log
 from distutils.command.build_ext import build_ext as _build_ext
 from distutils.core import setup, Extension
+from distutils.cmd import Command
 import os
 
+try:
+    from sphinx.setup_command import BuildDoc
+except ImportError:
+    BuildDoc = None
 
-class BuildWebSQL(_build_ext):
+
+class CmakeRun(Command):
+    description = 'Run cmake to build external library'
+
+    user_options = [
+        ('source-dir=', 'S', 'the source dir'),
+        ('libname=', 'N', 'the project name'),
+        ('define=', 'D', 'define options'),
+        ('cmake=', None, 'the cmake executable [default: cmake]'),
+        ('make=', None, 'the make executable [default: make]'),
+    ]
+
+    boolean_options = ['debug', 'trace']
+
+    def initialize_options(self):
+        """Set default values for all the options."""
+        self.debug = None
+        self.trace = None
+        self.define = False
+        self.source_dir = None
+        self.build_dir = None
+        self.libname = None
+        self.cmake = 'cmake'
+        self.make = 'make'
+
+    def finalize_options(self):
+        """Set final values for all the options."""
+        self.ensure_dirname('source_dir')
+        self.source_dir = os.path.abspath(self.source_dir)
+        if self.build_dir is None:
+            build = self.get_finalized_command('build')
+            self.build_dir = os.path.join(os.path.abspath(build.build_temp), self.libname)
+            self.mkpath(self.build_dir)
+        self.build_dir = os.path.abspath(self.build_dir)
+        if self.define:
+            print(self.define)
+            self.define = ['-D{0}'.format(v) for v in self.define.split(',') if v]
+
+    def command(self, cmd):
+        """announce command and spawn"""
+        self.announce(cmd)
+        self.spawn(cmd)
+
     def run(self):
-        path = os.path.abspath(os.path.join('extra', 'websqlclient'))
-        log.info("building 'websqlclient' library")
+        """build target by cmake"""
         pwd = os.getcwd()
-        temp_dir = os.path.join(self.build_temp, 'websqlclient')
-        self.mkpath(temp_dir)
-        os.chdir(temp_dir)
+        os.chdir(self.build_dir)
+        cmake_cmd = [self.cmake, self.source_dir] + self.define
+        make_cmd = [self.make]
+        if self.debug:
+            cmake_cmd.append('--debug-output')
+            make_cmd.append('-d')
+        if self.trace:
+            cmake_cmd.append('--trace')
         try:
-            self.spawn(['cmake', path, '-DDISABLE_SHARED=on', '-DWITH_PIC=1', '-DWITH_SSL=yes', '-DWITH_ZLIB=yes'])
-            self.spawn(['make'])
+            self.command(cmake_cmd)
+            self.command(make_cmd)
         finally:
             os.chdir(pwd)
 
-        self.include_dirs.extend([os.path.join(temp_dir, 'include'), os.path.join(path, 'include')])
-        self.libraries.append('websqlclient')
 
-        self.add_library_dirs((os.path.join(os.path.join(temp_dir, x) for x in ('libmysql', 'zlib'))))
-        self.add_library_dirs((os.path.join(temp_dir, 'extra', 'yassl', x) for x in ('', 'taocrypt')))
-        self.parse_libraries(os.path.join(temp_dir, 'libmysql', 'libraries.txt'))
-        self.extensions[0].depends.append(os.path.join(temp_dir, 'libmysql', 'libwebsqlclient.a'))
-        in_file = os.path.join(temp_dir, 'include', 'mysqld_error.h')
-        out_file = os.path.join(temp_dir, 'py_mysqld_error.c')
-        self.make_er(in_file, out_file)
-        self.extensions[0].sources.append(out_file)
+class GenErrors(Command):
+    description = 'Generate Error Codes'
+
+    def initialize_options(self):
+        """Set default values for all the options."""
+        self.sources = None
+        self.source_dir = None
+        self.target_dir = None
+
+    def finalize_options(self):
+        """Set final values for all the options."""
+        self.ensure_dirname('source_dir')
+        if self.source_dir is None:
+            cmake = self.get_finalized_command('build_client')
+            self.source_dir = os.path.join(cmake.build_dir, 'include')
+            self.mkpath(self.source_dir)
+        self.ensure_dirname('target_dir')
+        if self.target_dir is None:
+            build = self.get_finalized_command('build')
+            self.target_dir = os.path.join(build.build_temp, 'gen_errors')
+            self.target_dir = os.path.abspath(self.target_dir)
+            self.mkpath(self.target_dir)
+
+        if self.sources:
+            self.sources = self.sources.split(',')
+        else:
+            self.sources = []
+
+    def run(self):
+        """generate c-code for python based on error-codes in h file"""
+        for src in self.sources:
+            self.make_er(os.path.join(self.source_dir, src + '.h'), os.path.join(self.target_dir, src + '.c'))
+
+    @staticmethod
+    def make_er(source, target):
+        with open(source, 'rb') as source:
+            with open(target, 'wb') as target:
+                target.write(b"/* Autogenerated file, please don't edit */\n")
+                target.write(b"#include <mysqld_error.h>\n")
+                target.write(b"#define PY_SSIZE_T_CLEAN 1\n#include <Python.h>\n\n")
+                target.write(b"int _mysql_constants_add_err(PyObject* module) {\n")
+                for line in source:
+                    if not line.startswith(b'#define'):
+                        continue
+                    name = line.split()[1]
+                    target.write(b"    if (PyModule_AddIntMacro(module, " + name + b") < 0) return -1;\n")
+                target.write(b"    return 0;\n")
+                target.write(b"}\n")
+
+
+class BuildExt(_build_ext):
+    sub_commands = [('build_client', None), ('gen_errors', None)]
+
+    def run(self):
+        """run logic"""
+        for sub_command in self.get_sub_commands():
+            self.distribution.run_command(sub_command)
+
+        cmake = self.get_finalized_command('build_client')
+        self.include_dirs.extend(os.path.join(x, 'include') for x in (cmake.build_dir, cmake.source_dir))
+        self.libraries.append(cmake.libname)
+
+        self.add_library_dirs((os.path.join(os.path.join(cmake.build_dir, x) for x in ('libmysql', 'zlib'))))
+        self.add_library_dirs((os.path.join(cmake.build_dir, 'extra', 'yassl', x) for x in ('', 'taocrypt')))
+        self.parse_libraries(os.path.join(cmake.build_dir, 'libmysql', 'libraries.txt'))
+
+        gen_errors = self.get_finalized_command('gen_errors')
+        target_dir = gen_errors.target_dir
+        sources = gen_errors.sources
+        self.extensions[0].sources.extend(os.path.join(target_dir, x + '.c') for x in sources)
         super().run()
+
+        if BuildDoc is not None and not os.getenv('CI_BUILD', ''):
+            import sys
+            sys.path.append(self.build_lib)
+            self.distribution.run_command('build_doc')
 
     def add_library_dirs(self, paths):
         for p in paths:
@@ -57,25 +172,8 @@ class BuildWebSQL(_build_ext):
                     end = None
                 self.libraries.append(basename[start:end])
 
-    @staticmethod
-    def make_er(in_file, out_file):
-        with open(in_file, 'rb') as mysqld_errors:
-            with open(out_file, 'wb') as py_errors:
-                py_errors.write(b"/* Autogenerated file, please don't edit */\n")
-                py_errors.write(b"#include <mysqld_error.h>\n")
-                py_errors.write(b"#define PY_SSIZE_T_CLEAN 1\n#include <Python.h>\n\n")
-                py_errors.write(b"int _mysql_constants_add_err(PyObject* module) {\n")
-                for line in mysqld_errors:
-                    if not line.startswith(b'#define'):
-                        continue
-                    name = line.split()[1]
-                    py_errors.write(b"    if (PyModule_AddIntMacro(module, " + name + b") < 0) return -1;\n")
-                py_errors.write(b"    return 0;\n")
-                py_errors.write(b"}\n")
-
-
 __name__ = "websql"
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 extra_link_args = ["-lstdc++"]
 
@@ -95,51 +193,40 @@ module1 = Extension('_' + __name__,
                         ("__version__", __version__)
                     ])
 
+
+def readme():
+    with open(os.path.join('doc', 'README')) as r:
+        return r.read()
+
+
+cmdclass = {'build_ext': BuildExt,
+            'build_client': CmakeRun,
+            'build_doc': BuildDoc,
+            'gen_errors': GenErrors}
+
+command_options = {
+    'build_doc': {
+        'project': ('setup.py', __name__),
+        'version': ('setup.py', __version__),
+        'builder': ('setup.py', 'man')
+    }
+}
+
 setup(
     name=__name__,
     version=__version__,
     description='Asynchronous Python interface to MySQL',
-    cmdclass={'build_ext': BuildWebSQL},
+    cmdclass=cmdclass,
+    command_options=command_options,
     ext_modules=[module1],
-    py_modules=[
-        "websql._types",
-        "websql.connections",
-        "websql.converters",
-        "websql.cursors",
-        "websql.times"
-    ],
+    packages=["websql", "websql.fabric"],
     author="@bg",
     author_email='gaifullinbf@gmail.com',
     maintainer='@bg',
     maintainer_email='gaifullinbf@gmail.com',
     url='https://github.com/WebSQL/websql',
     license='GPL',
-    long_description="""\
-=========================
-Asynchronous Python interface for MySQL
-=========================
-\n
-WebSQL is an asynchronous interface to the popular MySQL_ database server for Python based on webscalesql.\n
-The design goals are:
-\n
-- Compatibility with Python3 asyncio package
-\n
-- Compatibility with WebScale fork of MySQL
-\n
-- Compliance with Python database API version 2.0 [PEP-0249]_
-\n
-- Thread-safety
-\n
-- Thread-friendliness (threads will not block each other)
-\n
-MySQL-5.5 and newer and Python-3.4 and newer are currently supported.
-\n
-WebSQL is `Free Software`_.
-\n
-.. _MySQL: http://www.mysql.com/
-.. _`Free Software`: http://www.gnu.org/
-.. [PEP-0249] http://www.python.org/peps/pep-0249.html
-      """,
+    long_description=readme(),
     classifiers=[
         "Development Status :: 5 - Beta",
         "Environment :: Other Environment",
