@@ -9,7 +9,7 @@ __unittest = True
 
 from datetime import timedelta
 from time import time
-from tests.case import DatabaseTestCase
+from .case import DatabaseTestCase
 import struct
 
 
