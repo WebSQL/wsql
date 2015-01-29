@@ -13,7 +13,7 @@ PyObject *_mysql_programming_error;
 PyObject *_mysql_not_supported_error;
 PyObject *_mysql_error_map;
 
-bool is_connection_lost(error_code)
+bool is_connection_lost(int error_code)
 {
     switch (error_code)
     {
@@ -25,7 +25,7 @@ bool is_connection_lost(error_code)
     }
 }
 
-bool is_retryable_error(error_code)
+bool is_retryable_error(int error_code)
 {
     /// connection error
     if (error_code >= CR_SOCKET_CREATE_ERROR && error_code <= CR_SERVER_GONE_ERROR)
@@ -62,11 +62,9 @@ _mysql_set_exception(PyObject* cls, int code, const char* message)
 PyObject*
 _mysql_exception(_mysql_connection_object *c)
 {
-    PyObject *error_class;
     int error_code;
 
     if (!_mysql_server_init_done || !c) {
-        error_class = _mysql_internal_error;
         return _mysql_set_exception(_mysql_internal_error, -1, "server not initialized");
     }
 

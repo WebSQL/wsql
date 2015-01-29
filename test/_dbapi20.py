@@ -13,9 +13,10 @@ __author__ = 'Stuart Bishop <zen@shangri-la.dropbear.id.au>'
 __unittest = True
 
 try:
-    from ._case import DatabaseTestCase
+    from _case import DatabaseTestCase
 except ImportError:
-    from case.
+    from ._case import DatabaseTestCase
+
 import time
 
 

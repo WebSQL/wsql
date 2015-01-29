@@ -1,5 +1,12 @@
-from tests.case import DatabaseTestCase, TestCase
-from tests.websql_context import WebSQLContext, WebSQLAsyncContext
+"""test non-standard function of package"""
+
+try:
+    from _case import DatabaseTestCase, TestCase
+    from _websql_context import WebSQLContext, WebSQLAsyncContext
+except ImportError:
+    from ._case import DatabaseTestCase, TestCase
+    from ._websql_context import WebSQLContext, WebSQLAsyncContext
+
 import websql
 import _websql
 import warnings

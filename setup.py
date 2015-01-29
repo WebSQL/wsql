@@ -6,7 +6,16 @@ from distutils.cmd import Command
 import os
 
 try:
-    from sphinx.setup_command import BuildDoc
+    from sphinx.setup_command import BuildDoc as _BuildDoc
+
+    class BuildDoc(_BuildDoc):
+        def finalize_options(self):
+            super().finalize_options()
+            if not self.project:
+                self.project = self.distribution.name
+            if not self.version:
+                self.version = self.distribution.version
+
 except ImportError:
     BuildDoc = None
 
@@ -195,7 +204,7 @@ module1 = Extension('_' + __name__,
 
 
 def readme():
-    with open(os.path.join('doc', 'README')) as r:
+    with open(os.path.join('README')) as r:
         return r.read()
 
 
@@ -204,20 +213,11 @@ cmdclass = {'build_ext': BuildExt,
             'build_doc': BuildDoc,
             'gen_errors': GenErrors}
 
-command_options = {
-    'build_doc': {
-        'project': ('setup.py', __name__),
-        'version': ('setup.py', __version__),
-        'builder': ('setup.py', 'man')
-    }
-}
-
 setup(
     name=__name__,
     version=__version__,
     description='Asynchronous Python interface to MySQL',
     cmdclass=cmdclass,
-    command_options=command_options,
     ext_modules=[module1],
     packages=["websql", "websql.fabric"],
     author="@bg",

@@ -1,7 +1,13 @@
+"""test DB-API 2.0 compatibility"""
+
 __author__ = "@bg"
 
-from tests.dbapi20 import DatabaseAPI20TestCases
-from tests.websql_context import WebSQLContext, WebSQLAsyncContext
+try:
+    from _dbapi20 import DatabaseAPI20TestCases
+    from _websql_context import WebSQLContext, WebSQLAsyncContext
+except ImportError:
+    from ._dbapi20 import DatabaseAPI20TestCases
+    from ._websql_context import WebSQLContext, WebSQLAsyncContext
 
 
 class TestWebSQLDBAPI20(DatabaseAPI20TestCases):

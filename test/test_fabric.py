@@ -3,8 +3,13 @@ Tests Connection Pools
 """
 __author__ = "@bg"
 
-from tests.case import DatabaseTestCase
-from tests.websql_context import WebSQLSetup, WebSQLSetupAsync, WebSQLContextBase
+try:
+    from _case import DatabaseTestCase
+    from _websql_context import WebSQLSetup, WebSQLSetupAsync, WebSQLContextBase
+except ImportError:
+    from ._case import DatabaseTestCase
+    from ._websql_context import WebSQLSetup, WebSQLSetupAsync, WebSQLContextBase
+
 from unittest import TestCase
 from websql.fabric import ConnectionPool, ConnectionProvider, transaction, retryable
 from websql.fabric.provider import ServerInfo, ConnectionHolderAsync, ConnectionHolderSync

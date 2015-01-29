@@ -6,10 +6,13 @@
  """
 __unittest = True
 
+try:
+    from _case import DatabaseTestCase
+except ImportError:
+    from ._case import DatabaseTestCase
 
 from datetime import timedelta
 from time import time
-from .case import DatabaseTestCase
 import struct
 
 

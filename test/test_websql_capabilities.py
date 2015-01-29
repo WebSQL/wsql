@@ -1,7 +1,11 @@
 __author__ = "@bg"
 
-from tests.capabilities import CapabilityTestCases
-from tests.websql_context import WebSQLContext, WebSQLAsyncContext
+try:
+    from _capabilities import CapabilityTestCases
+    from _websql_context import WebSQLContext, WebSQLAsyncContext
+except ImportError:
+    from ._capabilities import CapabilityTestCases
+    from ._websql_context import WebSQLContext, WebSQLAsyncContext
 
 
 class TestWebSQLCapabilities(CapabilityTestCases):
