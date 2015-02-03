@@ -13,6 +13,7 @@ except ImportError:
 from unittest import TestCase
 from websql.fabric import ConnectionPool, ConnectionProvider, transaction, retryable
 from websql.fabric.provider import ServerInfo, ConnectionHolderAsync, ConnectionHolderSync
+from websql.fabric import exception
 
 
 class DummyLogger:
@@ -346,3 +347,18 @@ class TestFabricAsync(TestFabric):
         return retryable(connection, retry_count, delay, loop=self._context.loop)
 
 del TestFabric
+
+
+class TestException(TestCase):
+    """
+    test user exceptions
+    """
+    class Error1(exception.UserError):
+        pass
+
+    def test_handle_error(self):
+        """test handle_error method"""
+
+        self.assertRaisesRegex(self.Error1, "(1, 'this is test error')", exception.handle_error, self, exception.UserError(1, "Error1; this is test error"))
+        self.assertRaisesRegex(exception.UserError, "(1, 'this is test error')", exception.handle_error, self, exception.UserError(1, "this is test error"))
+        self.assertRaisesRegex(ValueError, "this is test error", exception.handle_error, self, ValueError("this is test error"))
