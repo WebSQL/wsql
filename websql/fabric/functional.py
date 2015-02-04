@@ -58,11 +58,17 @@ def _close_transaction(connection):
     setattr(connection, '_transaction_scope', False)
 
 
-class _TransactionScopeAsync:
+class TransactionScope:
+    """base class for transaction scope"""
+    pass
+
+
+class _TransactionScopeAsync(TransactionScope):
     """asynchronous transaction scope"""
 
     def __init__(self, handler):
         self._handler = handler
+        self._is_coroutine = True  # For iscoroutinefunction().
 
     @coroutine
     def __call__(self, connection):
@@ -82,7 +88,7 @@ class _TransactionScopeAsync:
             _close_transaction(connection)
 
 
-class _TransactionScopeSync:
+class _TransactionScopeSync(TransactionScope):
     """synchronous transaction scope"""
 
     def __init__(self, handler):

@@ -11,7 +11,7 @@ except ImportError:
     from ._websql_context import WebSQLSetup, WebSQLSetupAsync, WebSQLContextBase
 
 from unittest import TestCase
-from websql.fabric import ConnectionPool, ConnectionProvider, transaction, retryable
+from websql.fabric import ConnectionPool, ConnectionProvider, transaction, retryable, cluster
 from websql.fabric.provider import ServerInfo, ConnectionHolderAsync, ConnectionHolderSync
 from websql.fabric import exception
 
@@ -201,7 +201,7 @@ class TestFabric(DatabaseTestCase):
         self._context.wait(cursor.execute("SELECT * FROM %s" % table))
         self.assertEqual([('Evelina',)], cursor.fetchall())
 
-    def test_recursive(self):
+    def test_recursive_transaction(self):
         """test recursive transaction"""
         table = self._create_table(('name VARCHAR(10)',), None)
 
@@ -225,6 +225,19 @@ class TestFabric(DatabaseTestCase):
         self.assertEqual(retry_count - 1, handler.call_count)
         handler = self.make_exception_handler(retry_count + 1)
         self.assertRaises(Exception, self._context.call_and_wait, connection.execute, handler)
+
+    def test_cluster(self):
+        """ test commutator """
+        read_connection = self.make_connection_holder(self._context.make_connection())
+        write_connection = self.make_connection_holder(self._context.make_connection())
+        read_connection.readonly = True
+        write_connection.readonly = False
+        read_handler = self.wrap_handler(lambda x: self.assertTrue(x.readonly))
+        write_handler = transaction(self.wrap_handler(lambda x: self.assertFalse(x.readonly)))
+
+        _commutator = cluster(read_connection=read_connection, write_connection=write_connection)
+        self._context.wait(_commutator.execute(read_handler))
+        self._context.wait(_commutator.execute(write_handler))
 
 
 class TestFabricSync(TestFabric):
@@ -267,9 +280,7 @@ class TestFabricSync(TestFabric):
         :param handler: the handler to wrap
         :return: wrapped handler
         """
-        def wrapper(connection):
-            return handler(connection)
-        return wrapper
+        return handler
 
     def make_exception_handler(self, retry_count):
         def handler(_):
@@ -320,7 +331,9 @@ class TestFabricAsync(TestFabric):
         """
         @self._context.decorator
         def wrapper(connection):
-            return (yield from handler(connection))
+            if self._context.iscoroutine(handler):
+                return (yield from handler(connection))
+            return handler(connection)
         return wrapper
 
     def make_connection_holder(self, connection):

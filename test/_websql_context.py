@@ -37,6 +37,10 @@ class WebSQLSetup(WebSQLSetupBase):
         """function decorate policy"""
         return func
 
+    @staticmethod
+    def iscoroutine(_):
+        return False
+
     def connect(self):
         """
         :return: new connection to database
@@ -108,6 +112,10 @@ class WebSQLSetupAsync(WebSQLSetupBase):
     @staticmethod
     def decorator(func):
         return asyncio.coroutine(func)
+
+    @staticmethod
+    def iscoroutine(func):
+        return asyncio.iscoroutine(func) or asyncio.iscoroutinefunction(func)
 
     def clean(self):
         """
