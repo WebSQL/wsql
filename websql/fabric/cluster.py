@@ -19,10 +19,10 @@ class _Cluster:
         """
         self.__cluster = [read_connection, write_connection]
 
-    def execute(self, handler):
+    def execute(self, request):
         """execute handler"""
 
-        return self.__cluster[isinstance(handler, TransactionScope)].execute(handler)
+        return self.__cluster[isinstance(request, TransactionScope)].execute(request)
 
 
 cluster = _Cluster

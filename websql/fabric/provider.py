@@ -86,13 +86,13 @@ class ConnectionHolder:
 @_nonblocking
 class ConnectionHolderAsync(ConnectionHolder):
     @coroutine
-    def execute(self, handler):
+    def execute(self, request):
         """
         execute the database query
-        :param handler: - the callable object, that implement logic to query database
-        :return the result of handler
+        :param request: - the callable object, that implement logic to query database
+        :return the result of request
         """
-        return (yield from handler(self))
+        return (yield from request(self))
 
     @coroutine
     def commit(self):
@@ -106,13 +106,13 @@ class ConnectionHolderAsync(ConnectionHolder):
 
 
 class ConnectionHolderSync(ConnectionHolder):
-    def execute(self, handler):
+    def execute(self, request):
         """
         execute the database query
-        :param handler: - the callable object, that implement logic to query database
-        :return the result of handler
+        :param request: - the callable object, that implement logic to query database
+        :return the result of request
         """
-        return handler(self)
+        return request(self)
 
     def commit(self):
         """an alias for connection.commit()"""

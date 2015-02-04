@@ -39,12 +39,12 @@ class TestFabric(DatabaseTestCase):
         """abstract method to create connection pool"""
         raise NotImplementedError
 
-    def get_insert_handler(self, table, error=None):
+    def get_insert_request(self, table, error=None):
         """
-        get the query handler
+        get the query request
         :param table: the temporary table name
         :param error: error, that should be raised if specified
-        :return: the handler, that run query logic
+        :return: the request, that run query logic
         """
         raise NotImplementedError
 
@@ -56,11 +56,11 @@ class TestFabric(DatabaseTestCase):
         """
         raise NotImplementedError
 
-    def wrap_handler(self, handler):
+    def wrap_request(self, request):
         """
-        make a new handler around specified
-        :param handler: the handler to wrap
-        :return: wrapped handler
+        make a new request around specified
+        :param request: the request to wrap
+        :return: wrapped request
         """
         raise NotImplementedError
 
@@ -68,8 +68,8 @@ class TestFabric(DatabaseTestCase):
         """create a new retryable connection to database"""
         raise NotImplementedError
 
-    def make_exception_handler(self, retry_count):
-        """create handler with retry_count"""
+    def make_exception_request(self, retry_count):
+        """create request with retry_count"""
         raise NotImplementedError
 
     def count_calls(self, func):
@@ -181,9 +181,9 @@ class TestFabric(DatabaseTestCase):
         table = self._create_table(('name VARCHAR(10)',), None)
 
         connection_holder = self.make_connection_holder(self._context.make_connection())
-        handler = self.get_insert_handler(table, Exception('rollback expected!'))
+        request = self.get_insert_request(table, Exception('rollback expected!'))
         self.assertRaisesRegex(Exception, 'rollback expected!',
-                               self._context.call_and_wait, connection_holder.execute, transaction(handler))
+                               self._context.call_and_wait, connection_holder.execute, transaction(request))
 
         cursor = self._context.cursor()
         self._context.wait(cursor.execute("SELECT * FROM %s" % table))
@@ -194,8 +194,8 @@ class TestFabric(DatabaseTestCase):
         table = self._create_table(('name VARCHAR(10)',), None)
 
         connection_holder = self.make_connection_holder(self._context.make_connection())
-        handler = self.get_insert_handler(table)
-        self._context.wait(connection_holder.execute(transaction(handler)))
+        request = self.get_insert_request(table)
+        self._context.wait(connection_holder.execute(transaction(request)))
 
         cursor = self._context.cursor()
         self._context.wait(cursor.execute("SELECT * FROM %s" % table))
@@ -206,11 +206,11 @@ class TestFabric(DatabaseTestCase):
         table = self._create_table(('name VARCHAR(10)',), None)
 
         connection_holder = self.make_connection_holder(self._context.make_connection())
-        handler = self.wrap_handler(transaction(self.get_insert_handler(table)))
+        request = self.wrap_request(transaction(self.get_insert_request(table)))
 
         connection_holder.commit = self.count_calls(connection_holder.commit)
         connection_holder.commit.call_count = 0
-        self._context.wait(connection_holder.execute(transaction(handler)))
+        self._context.wait(connection_holder.execute(transaction(request)))
         self.assertEqual(1, connection_holder.commit.call_count)
 
     def test_retries(self):
@@ -219,12 +219,12 @@ class TestFabric(DatabaseTestCase):
         delay = 0.1
 
         connection = self.make_retryable(self.make_connection_holder(self._context.make_connection()), retry_count, delay)
-        handler = self.make_exception_handler(retry_count - 1)
-        self._context.wait(connection.execute(handler))
+        request = self.make_exception_request(retry_count - 1)
+        self._context.wait(connection.execute(request))
 
-        self.assertEqual(retry_count - 1, handler.call_count)
-        handler = self.make_exception_handler(retry_count + 1)
-        self.assertRaises(Exception, self._context.call_and_wait, connection.execute, handler)
+        self.assertEqual(retry_count - 1, request.call_count)
+        request = self.make_exception_request(retry_count + 1)
+        self.assertRaises(Exception, self._context.call_and_wait, connection.execute, request)
 
     def test_cluster(self):
         """ test commutator """
@@ -232,12 +232,12 @@ class TestFabric(DatabaseTestCase):
         write_connection = self.make_connection_holder(self._context.make_connection())
         read_connection.readonly = True
         write_connection.readonly = False
-        read_handler = self.wrap_handler(lambda x: self.assertTrue(x.readonly))
-        write_handler = transaction(self.wrap_handler(lambda x: self.assertFalse(x.readonly)))
+        read_request = self.wrap_request(lambda x: self.assertTrue(x.readonly))
+        write_request = transaction(self.wrap_request(lambda x: self.assertFalse(x.readonly)))
 
         _commutator = cluster(read_connection=read_connection, write_connection=write_connection)
-        self._context.wait(_commutator.execute(read_handler))
-        self._context.wait(_commutator.execute(write_handler))
+        self._context.wait(_commutator.execute(read_request))
+        self._context.wait(_commutator.execute(write_request))
 
 
 class TestFabricSync(TestFabric):
@@ -253,8 +253,8 @@ class TestFabricSync(TestFabric):
         """create connection pool"""
         return ConnectionPool(provider, size, timeout=timeout, nonblocking=False)
 
-    def get_insert_handler(self, table, error=None):
-        def handler(connection):
+    def get_insert_request(self, table, error=None):
+        def request(connection):
             cursor = self._context.wrap(connection.cursor())
             try:
                 self._context.wait(cursor.execute('INSERT INTO `%s` VALUES(\'%s\');' % (table, 'Evelina')))
@@ -264,7 +264,7 @@ class TestFabricSync(TestFabric):
             if error:
                 raise error
 
-        return handler
+        return request
 
     def make_connection_holder(self, connection):
         """
@@ -274,24 +274,24 @@ class TestFabricSync(TestFabric):
         """
         return ConnectionHolderSync(connection)
 
-    def wrap_handler(self, handler):
+    def wrap_request(self, request):
         """
-        make a new handler around specified
-        :param handler: the handler to wrap
-        :return: wrapped handler
+        make a new request around specified
+        :param request: the request to wrap
+        :return: wrapped request
         """
-        return handler
+        return request
 
-    def make_exception_handler(self, retry_count):
-        def handler(_):
-            handler.call_count += 1
-            if handler.call_count < retry_count:
+    def make_exception_request(self, retry_count):
+        def request(_):
+            request.call_count += 1
+            if request.call_count < retry_count:
                 exc = self._context.errors.Error(self._context.constants.CR_SERVER_LOST, "connection lost")
                 exc.code = self._context.constants.CR_SERVER_LOST
                 raise exc
             return None
-        handler.call_count = 0
-        return handler
+        request.call_count = 0
+        return request
 
     def make_retryable(self, connection, retry_count, delay):
         return retryable(connection, retry_count, delay)
@@ -310,9 +310,9 @@ class TestFabricAsync(TestFabric):
         """create connection pool"""
         return ConnectionPool(provider, size, timeout=timeout, loop=self._context.loop, nonblocking=True)
 
-    def get_insert_handler(self, table, error=None):
+    def get_insert_request(self, table, error=None):
         @self._context.decorator
-        def handler(connection):
+        def request(connection):
             cursor = connection.cursor()
             try:
                 yield from cursor.execute('INSERT INTO %s VALUES (\'%s\')' % (table, 'Evelina'))
@@ -321,19 +321,19 @@ class TestFabricAsync(TestFabric):
 
             if error:
                 raise error
-        return handler
+        return request
 
-    def wrap_handler(self, handler):
+    def wrap_request(self, request):
         """
-        make a new handler around specified
-        :param handler: the handler to wrap
-        :return: wrapped handler
+        make a new request around specified
+        :param request: the request to wrap
+        :return: wrapped request
         """
         @self._context.decorator
         def wrapper(connection):
-            if self._context.iscoroutine(handler):
-                return (yield from handler(connection))
-            return handler(connection)
+            if self._context.iscoroutine(request):
+                return (yield from request(connection))
+            return request(connection)
         return wrapper
 
     def make_connection_holder(self, connection):
@@ -344,17 +344,17 @@ class TestFabricAsync(TestFabric):
         """
         return ConnectionHolderAsync(connection)
 
-    def make_exception_handler(self, retry_count):
+    def make_exception_request(self, retry_count):
         @self._context.decorator
-        def handler(_):
-            handler.call_count += 1
-            if handler.call_count < retry_count:
+        def request(_):
+            request.call_count += 1
+            if request.call_count < retry_count:
                 exc = self._context.errors.Error(self._context.constants.CR_SERVER_LOST, "connection lost")
                 exc.code = self._context.constants.CR_SERVER_LOST
                 raise exc
             return None
-        handler.call_count = 0
-        return handler
+        request.call_count = 0
+        return request
 
     def make_retryable(self, connection, retry_count, delay):
         return retryable(connection, retry_count, delay, loop=self._context.loop)

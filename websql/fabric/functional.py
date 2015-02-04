@@ -35,15 +35,15 @@ def retryable(connection, count=5, delay=1, loop=None):
     return _RetryableSync(connection, count=count, delay=delay)
 
 
-def transaction(handler):
+def transaction(request):
     """
-    make handler transactional
-    :param handler: the handler
+    make request transactional
+    :param request: the request
     """
 
-    if iscoroutinefunction(handler) or iscoroutine(handler):
-        return _TransactionScopeAsync(handler)
-    return _TransactionScopeSync(handler)
+    if iscoroutinefunction(request) or iscoroutine(request):
+        return _TransactionScopeAsync(request)
+    return _TransactionScopeSync(request)
 
 
 def _is_transaction_scope(connection):
@@ -66,18 +66,18 @@ class TransactionScope:
 class _TransactionScopeAsync(TransactionScope):
     """asynchronous transaction scope"""
 
-    def __init__(self, handler):
-        self._handler = handler
+    def __init__(self, request):
+        self._request = request
         self._is_coroutine = True  # For iscoroutinefunction().
 
     @coroutine
     def __call__(self, connection):
         if _is_transaction_scope(connection):
-            return (yield from self._handler(connection))
+            return (yield from self._request(connection))
 
         try:
             _begin_transaction(connection)
-            r = yield from self._handler(connection)
+            r = yield from self._request(connection)
             yield from connection.commit()
             return r
         except:
@@ -91,16 +91,16 @@ class _TransactionScopeAsync(TransactionScope):
 class _TransactionScopeSync(TransactionScope):
     """synchronous transaction scope"""
 
-    def __init__(self, handler):
-        self._handler = handler
+    def __init__(self, request):
+        self._request = request
 
     def __call__(self, connection):
         if _is_transaction_scope(connection):
-            return self._handler(connection)
+            return self._request(connection)
 
         try:
             _begin_transaction(connection)
-            r = self._handler(connection)
+            r = self._request(connection)
             connection.commit()
             return r
         except:
@@ -122,20 +122,20 @@ class RetryableAsync:
         self._loop = loop or get_event_loop()
         self._sleep = asyncio.sleep
 
-    def execute(self, handler):
-        """execute handler in current connection"""
-        return self._execute(handler, self._count - 1)
+    def execute(self, request):
+        """execute request in current connection"""
+        return self._execute(request, self._count - 1)
 
     @coroutine
-    def _execute(self, handler, retry_number):
-        """internal method to execute handler with retry-count check"""
+    def _execute(self, request, retry_number):
+        """internal method to execute request with retry-count check"""
         try:
-            return (yield from self._connection.execute(handler))
+            return (yield from self._connection.execute(request))
         except Exception as e:
             if retry_number <= 0 or not _websql.exceptions.is_retryable(e):
                 raise
         yield from self._sleep(self._delay, loop=self._loop)
-        return (yield from self._execute(handler, retry_number - 1))
+        return (yield from self._execute(request, retry_number - 1))
 
 
 class _RetryableSync:
@@ -147,16 +147,16 @@ class _RetryableSync:
         self._delay = delay
         self._sleep = time.sleep
 
-    def execute(self, handler):
-        """execute handler in current connection"""
-        return self._execute(handler, self._count - 1)
+    def execute(self, request):
+        """execute request in current connection"""
+        return self._execute(request, self._count - 1)
 
-    def _execute(self, handler, retry_number):
+    def _execute(self, request, retry_number):
         try:
-            return self._connection.execute(handler)
+            return self._connection.execute(request)
         except Exception as e:
             if retry_number <= 0 or not _websql.exceptions.is_retryable(e):
                 raise
 
         self._sleep(self._delay)
-        return self._execute(handler, retry_number - 1)
+        return self._execute(request, retry_number - 1)
