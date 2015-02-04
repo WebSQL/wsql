@@ -5,10 +5,10 @@ __author__ = "Bulat Gaifullin (bulat.gaifullin@acronis.com)"
 
 from .functional import TransactionScope
 
-__all__ = ["cluster"]
+__all__ = ["Cluster"]
 
 
-class _Cluster:
+class Cluster:
     """asynchronous commutator"""
 
     def __init__(self, read_connection, write_connection):
@@ -23,6 +23,3 @@ class _Cluster:
         """execute handler"""
 
         return self.__cluster[isinstance(request, TransactionScope)].execute(request)
-
-
-cluster = _Cluster

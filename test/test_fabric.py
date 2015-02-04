@@ -11,7 +11,7 @@ except ImportError:
     from ._websql_context import WebSQLSetup, WebSQLSetupAsync, WebSQLContextBase
 
 from unittest import TestCase
-from websql.fabric import ConnectionPool, ConnectionProvider, transaction, retryable, cluster
+from websql.fabric import ConnectionPool, ConnectionProvider, transaction, retryable, Cluster
 from websql.fabric.provider import ServerInfo, ConnectionHolderAsync, ConnectionHolderSync
 from websql.fabric import exception
 
@@ -235,7 +235,7 @@ class TestFabric(DatabaseTestCase):
         read_request = self.wrap_request(lambda x: self.assertTrue(x.readonly))
         write_request = transaction(self.wrap_request(lambda x: self.assertFalse(x.readonly)))
 
-        _commutator = cluster(read_connection=read_connection, write_connection=write_connection)
+        _commutator = Cluster(read_connection=read_connection, write_connection=write_connection)
         self._context.wait(_commutator.execute(read_request))
         self._context.wait(_commutator.execute(write_request))
 
