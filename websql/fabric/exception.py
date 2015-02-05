@@ -19,10 +19,10 @@ class UserError(ProgrammingError):
         self.message = message
 
 
-def handle_error(exceptions, error):
+def handle_error(exceptions, error, sep=';'):
     if isinstance(error, Error):
         try:
-            cls, _, msg = error.message.partition(';')
+            cls, _, msg = error.message.partition(sep)
             exc = getattr(exceptions, cls.strip())
             raise exc(error.code, msg.strip()) from None
         except AttributeError:
