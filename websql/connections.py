@@ -53,6 +53,7 @@ def connect(*args, nonblocking=None, **kwargs):
     :type decoders: list|tuple
     :param encoders: SQL encoder stack
     :type encoders: list|tuple
+    :param row_formatter: the function to format row
     :param connect_timeout: number of seconds to wait before the connection attempt fails.
     :type connect_timeout: number
     :param compress: if set, compression is enabled
