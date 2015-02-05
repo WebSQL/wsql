@@ -338,7 +338,7 @@ class Cursor(CursorBase):
         :return formatted row or None if there is no more rows
         """
         self._check_has_result()
-        return self.row_formatter(self._row_decoders, self._result.fetch_row())
+        return self.row_formatter(self._row_decoders, (x[0] for x in self._result.description), self._result.fetch_row())
 
     def fetchmany(self, size=None):
         """Fetch up to size rows from the cursor. Result set may be smaller
@@ -563,7 +563,7 @@ class CursorAsync(CursorBase):
         self._check_has_result()
 
         connection = self.connection
-        return self.row_formatter(self._row_decoders, (yield from connection.promise(self._result.fetch_row_async)))
+        return self.row_formatter(self._row_decoders, (x[0] for x in self._result.description), (yield from connection.promise(self._result.fetch_row_async)))
 
     @asyncio.coroutine
     def fetchmany(self, size=None):

@@ -3,6 +3,7 @@ WebSQL type conversion module
 ------------------------------
 """
 
+from collections import defaultdict
 from decimal import Decimal
 import datetime
 import struct
@@ -212,7 +213,7 @@ def default_encoder(_, value):
     first class it can find for which obj is an instance.
     """
     try:
-        conv = next(key for key in simple_type_encoders.keys() if isinstance(value, key))
+        conv = next(key for key in simple_type_encoders if isinstance(value, key))
     except StopIteration:
         return any_to_sql
 
@@ -275,7 +276,8 @@ def get_codec(connection, field, codecs):
     :param connection: the connection object
     :param field: the value to convert
     :param codecs: the list of codecs
-    :return:
+    :return: the function to convert specified field
+    :raises: connection.NotSupportedError if there is no known converted to field
     """
     for c in codecs:
         func = c(connection, field)
@@ -284,18 +286,57 @@ def get_codec(connection, field, codecs):
     raise connection.NotSupportedError(("could not encode as SQL", field))
 
 
-def iter_row_decoder(decoders, row):
-    """convert mysql row to iterable object"""
+def iter_row_decoder(decoders, _, row):
+    """
+    convert mysql row to iterable object
+    :param decoders: the row decoder
+    :param row: the raw row"
+    :return the formatted row with delayed eval
+    :rtype: generator
+    """
     if row is None:
         return None
     return (d(col) for d, col in zip(decoders, row))
 
 
-def tuple_row_decoder(decoders, row):
-    """convert mysql row to tuple"""
+def tuple_row_decoder(decoders, names, row):
+    """
+    convert mysql row to tuple
+    :param decoders: the row decoder
+    :param names: the field names
+    :param row: the raw row"
+    :return the formatted row list
+    :rtype: tuple
+    """
     if row is None:
         return None
-    return tuple(iter_row_decoder(decoders, row))
+    return tuple(iter_row_decoder(decoders, names, row))
+
+
+def dict_row_decoder(decoders, names, row):
+    """
+    decode row as dict
+    :param decoders: the row decoder
+    :param names: field names
+    :param row: the formatted row
+    :return: the dict
+    :rtype: dict
+    """
+    if row is None:
+        return None
+
+    def recursive_factory():
+        return defaultdict(recursive_factory)
+
+    result = defaultdict(recursive_factory)
+
+    for name, value in zip(names, iter_row_decoder(decoders, names, row)):
+        *patch, name = name.split('.')
+        o = result
+        for p in patch:
+            o = o[p]
+        o[name] = value
+    return result
 
 
 default_row_formatter = tuple_row_decoder

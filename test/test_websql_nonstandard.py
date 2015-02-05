@@ -2,14 +2,16 @@
 
 try:
     from _case import DatabaseTestCase, TestCase
-    from _websql_context import WebSQLContext, WebSQLAsyncContext
+    from _websql_context import WebSQLSetup, WebSQLSetupAsync, WebSQLContextBase
 except ImportError:
     from ._case import DatabaseTestCase, TestCase
-    from ._websql_context import WebSQLContext, WebSQLAsyncContext
+    from ._websql_context import WebSQLSetup, WebSQLSetupAsync, WebSQLContextBase
 
+from websql import converters
 import websql
 import _websql
 import warnings
+import types
 
 
 class TestDBAPISet(TestCase):
@@ -24,6 +26,41 @@ class TestDBAPISet(TestCase):
 
     def test_set_inequality_membership(self):
         self.assertNotEqual(_websql.constants.FIELD_TYPE_DATE, websql.STRING)
+
+
+class TestConverters(TestCase):
+    def test_tuple_row_decoder(self):
+        """test format row as tuple"""
+        rows = list(range(4))
+        decoders = (lambda x: x for _ in range(len(rows)))
+        self.assertIsNone(converters.tuple_row_decoder(decoders, None, None))
+        result = converters.tuple_row_decoder(decoders, None, rows)
+        self.assertEqual(tuple(rows), result)
+
+    def test_iter_row_decoder(self):
+        """test format row as generator"""
+        rows = list(range(4))
+        decoders = (lambda x: x for _ in range(len(rows)))
+        self.assertIsNone(converters.iter_row_decoder(decoders, None, None))
+        result = converters.iter_row_decoder(decoders, None, rows)
+        self.assertIsInstance(result, types.GeneratorType)
+        self.assertEqual(tuple(rows), tuple(result))
+
+    def test_dict_row_decoder(self):
+        """test format row as dict"""
+        rows = list(range(4))
+
+        names = ("a", "b.c", "d.e.f.g", "i.k.l.m.n")
+        decoders = (lambda x: x for _ in range(len(rows)))
+        self.assertIsNone(converters.dict_row_decoder(decoders, None, None))
+        result = converters.dict_row_decoder(decoders, names, rows)
+        self.assertEqual({"a": 0, "b": {"c": 1}, "d": {"e": {"f": {"g": 2}}}, "i": {"k": {"l": {"m": {"n": 3}}}}}, result)
+
+    def test_get_codec(self):
+        """test get_codec method"""
+        self.assertRaisesRegex(WebSQLSetup.errors.NotSupportedError, "could not encode as SQL", converters.get_codec, WebSQLSetup.errors, None, ())
+        self.assertRaisesRegex(WebSQLSetup.errors.NotSupportedError, "could not encode as SQL", converters.get_codec, WebSQLSetup.errors, None, (lambda x, y: None,))
+        self.assertEqual("a", converters.get_codec(None, None, (lambda x, y: "a",)))
 
 
 class TestCoreModule(TestCase):
@@ -77,13 +114,13 @@ class CoreAPI(DatabaseTestCase):
 class TestCoreApi(CoreAPI):
     @classmethod
     def get_context(cls):
-        return WebSQLContext()
+        return WebSQLContextBase(WebSQLSetup())
 
 
 class TestCoreAsyncApi(CoreAPI):
     @classmethod
     def get_context(cls):
-        return WebSQLAsyncContext()
+        return WebSQLContextBase(WebSQLSetupAsync())
 
 del CoreAPI
 
@@ -129,7 +166,7 @@ class TestCursorBase(DatabaseTestCase):
 class TestCursor(TestCursorBase):
     @classmethod
     def get_context(cls):
-        return WebSQLContext()
+        return WebSQLContextBase(WebSQLSetup())
 
     def test_context_manager(self):
         # in case if cursor will not closed warning will be raised
@@ -140,6 +177,6 @@ class TestCursor(TestCursorBase):
 class TestCursorAsync(TestCursorBase):
     @classmethod
     def get_context(cls):
-        return WebSQLAsyncContext()
+        return WebSQLContextBase(WebSQLSetupAsync())
 
 del TestCursorBase
