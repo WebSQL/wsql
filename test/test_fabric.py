@@ -366,12 +366,13 @@ class TestException(TestCase):
     """
     test user exceptions
     """
-    class Error1(exception.UserError):
+    class TestError(exception.UserError):
         pass
 
     def test_handle_error(self):
         """test handle_error method"""
 
-        self.assertRaisesRegex(self.Error1, "(1, 'this is test error')", exception.handle_error, self, exception.UserError(1, "Error1; this is test error"))
+        self.assertRaisesRegex(self.TestError, "(1, 'this is test error')", exception.handle_error, self, exception.UserError(1, "TestError; this is test error"))
+        self.assertRaisesRegex(exception.UserError, "(1, 'Test2Error; this is test error')", exception.handle_error, self, exception.UserError(1, "Test2Error; this is test error"))
         self.assertRaisesRegex(exception.UserError, "(1, 'this is test error')", exception.handle_error, self, exception.UserError(1, "this is test error"))
         self.assertRaisesRegex(ValueError, "this is test error", exception.handle_error, self, ValueError("this is test error"))
