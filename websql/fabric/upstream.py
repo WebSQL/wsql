@@ -15,7 +15,7 @@ from time import monotonic
 __all__ = ["Upstream"]
 
 
-def upstream(*args, nonblocking=True, **kwargs):
+def upstream(*args, nonblocking=True, loop=None, **kwargs):
     """
     create a new connection provider
     :param args: connection provider positional arguments
@@ -24,7 +24,7 @@ def upstream(*args, nonblocking=True, **kwargs):
     :return: the new ConnectionProvider
     """
     if nonblocking:
-        return UpstreamAsync(*args, **kwargs)
+        return UpstreamAsync(*args, loop=loop, **kwargs)
     return UpstreamSync(*args, **kwargs)
 
 Upstream = upstream

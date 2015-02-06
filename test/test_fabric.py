@@ -231,6 +231,30 @@ class TestFabric(DatabaseTestCase):
         cluster = Cluster(master=None, slave=read_connection)
         self.assertRaisesRegex(Exception, "the operation is not permitted on read-only cluster", cluster.execute, write_request)
 
+    def test_smart_connect(self):
+        """test construct smart connect"""
+        connection_args = {"master": "localhost:3306#2,localhost#4", "slave": "localhost:3306#2", "database": "test"}
+        connection = smart_connect(connection_args, nonblocking=self._context.nonblocking)
+        self.assertIsInstance(connection, Cluster)
+        self.assertEqual(6, len(connection._cluster[1]._connection._upstream))
+        self.assertEqual(2, len(connection._cluster[0]._connection._upstream))
+        connection_args = {"slave": "localhost:3306#2", "database": "test"}
+        self.assertIsInstance(smart_connect(connection_args, nonblocking=self._context.nonblocking), Cluster)
+        connection_args = {"master": "localhost:3306#2,localhost#4", "database": "test"}
+        self.assertFalse(isinstance(smart_connect(connection_args, nonblocking=self._context.nonblocking), Cluster))
+        connection_args = {}
+        self.assertFalse(isinstance(smart_connect(connection_args, nonblocking=self._context.nonblocking), Cluster))
+        connection_args = "master=localhost:3306#2,localhost#4;slave=localhost:3306#2;database=test;"
+        connection = smart_connect(connection_args, nonblocking=self._context.nonblocking)
+        self.assertIsInstance(connection, Cluster)
+        self.assertEqual(6, len(connection._cluster[1]._connection._upstream))
+        self.assertEqual(2, len(connection._cluster[0]._connection._upstream))
+        # test real connect
+        connection_args = {"master": "%(host)s" % WebSQLSetup.connect_kwargs}
+        connection_args.update(WebSQLSetup.connect_kwargs)
+        connection = smart_connect(connection_args, nonblocking=self._context.nonblocking)
+        connection.execute(self.wrap_request(lambda x: None))
+
 
 class TestFabricSync(TestFabric):
     @classmethod
@@ -352,24 +376,3 @@ class TestException(TestCase):
         self.assertRaisesRegex(exception.UserError, "(1, 'Test2Error; this is test error')", exception.handle_error, self, exception.UserError(1, "Test2Error; this is test error"))
         self.assertRaisesRegex(exception.UserError, "(1, 'this is test error')", exception.handle_error, self, exception.UserError(1, "this is test error"))
         self.assertRaisesRegex(ValueError, "this is test error", exception.handle_error, self, ValueError("this is test error"))
-
-
-class TestSmartConnect(TestCase):
-    def test_smart_connect(self):
-        """test construct smart connect"""
-        connection_args = {"master": "localhost:3306#2,localhost#4", "slave": "localhost:3306#2", "database": "test"}
-        connection = smart_connect(connection_args, nonblocking=False)
-        self.assertIsInstance(connection, Cluster)
-        self.assertEqual(6, len(connection._cluster[1]._connection._upstream))
-        self.assertEqual(2, len(connection._cluster[0]._connection._upstream))
-        connection_args = {"slave": "localhost:3306#2", "database": "test"}
-        self.assertIsInstance(smart_connect(connection_args, nonblocking=False), Cluster)
-        connection_args = {"master": "localhost:3306#2,localhost#4", "database": "test"}
-        self.assertFalse(isinstance(smart_connect(connection_args, nonblocking=False), Cluster))
-        connection_args = {}
-        self.assertFalse(isinstance(smart_connect(connection_args, nonblocking=False), Cluster))
-        connection_args = "master=localhost:3306#2,localhost#4;slave=localhost:3306#2;database=test;"
-        connection = smart_connect(connection_args, nonblocking=False)
-        self.assertIsInstance(connection, Cluster)
-        self.assertEqual(6, len(connection._cluster[1]._connection._upstream))
-        self.assertEqual(2, len(connection._cluster[0]._connection._upstream))

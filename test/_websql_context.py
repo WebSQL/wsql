@@ -32,6 +32,8 @@ class WebSQLSetupBase:
 
 
 class WebSQLSetup(WebSQLSetupBase):
+    nonblocking = False
+
     @staticmethod
     def decorator(func):
         """function decorate policy"""
@@ -83,6 +85,8 @@ class WebSQLSetup(WebSQLSetupBase):
 
 
 class WebSQLSetupAsync(WebSQLSetupBase):
+    nonblocking = True
+
     class WrapObject:
         def __init__(self, obj, context):
             super().__setattr__('obj', obj)

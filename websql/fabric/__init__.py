@@ -33,7 +33,7 @@ def smart_connect(connection_args, nonblocking=True, loop=None, logger=None):
             return uri
 
         upstream = Upstream((x.groupdict() for x in host_pattern.finditer(uri)),
-                            timeout=timeout / 2, loop=loop, nonblocking=nonblocking, logger=logger)
+                            connect_timeout=timeout, loop=loop, nonblocking=nonblocking, logger=logger)
 
         return retryable(ConnectionPool(upstream, timeout=timeout, loop=loop, nonblocking=nonblocking), count=retries, delay=delay)
 
