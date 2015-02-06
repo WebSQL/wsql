@@ -373,7 +373,7 @@ class Cursor(CursorBase):
         raise self.NotSupportedError
 
 
-class CursorAsync(CursorBase):
+class AsyncCursor(CursorBase):
     """Asynchronous cursor implementation"""
 
     NET_ASYNC_COMPLETE = _websql.constants.NET_ASYNC_COMPLETE
@@ -382,7 +382,7 @@ class CursorAsync(CursorBase):
     class _NullResult:
         @staticmethod
         def fetch_row_async():
-            return CursorAsync.NET_ASYNC_COMPLETE, None
+            return AsyncCursor.NET_ASYNC_COMPLETE, None
 
         free_async = fetch_row_async
 

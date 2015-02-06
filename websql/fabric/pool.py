@@ -6,23 +6,24 @@ This module implements connections pools for WebSQL.
 """
 
 from asyncio import coroutine, wait_for
+from websql.connections import UNSET
 
 
 __all__ = ["ConnectionPool"]
 
 
-def connection_poll(*args, nonblocking=True, loop=None, **kwargs):
+def connection_poll(*args, loop=UNSET, **kwargs):
     """
     create a new connection pool
     :param args: connection pool positional arguments
-    :param nonblocking: if True, the non-blocking version will be created
+    :param loop: the event loop, if specified, the asynchronous connection pool will be created
     :param kwargs: connection pool keyword arguments
     :return: the new ConnectionPool
     """
 
-    if nonblocking:
-        return ConnectionPoolAsync(*args, loop=loop, **kwargs)
-    return ConnectionPoolSync(*args, **kwargs)
+    if loop is not UNSET:
+        return _AsyncConnectionPool(*args, loop=loop, **kwargs)
+    return _ConnectionPool(*args, **kwargs)
 
 ConnectionPool = connection_poll
 
@@ -61,7 +62,7 @@ class _ConnectionPoolBase:
             self._upstream.invalidate(connection)
 
 
-class ConnectionPoolAsync(_ConnectionPoolBase):
+class _AsyncConnectionPool(_ConnectionPoolBase):
     """
         Asynchronous connection pool
         the connections will be created on demand
@@ -112,7 +113,7 @@ class ConnectionPoolAsync(_ConnectionPoolBase):
             self._release(connection)
 
 
-class ConnectionPoolSync(_ConnectionPoolBase):
+class _ConnectionPool(_ConnectionPoolBase):
     """
         Synchronous connection pool
         the connections will be created on demand

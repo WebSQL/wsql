@@ -10,12 +10,13 @@ import sys
 
 from asyncio import coroutine
 from time import monotonic
+from websql.connections import UNSET
 
 
 __all__ = ["Upstream"]
 
 
-def upstream(*args, nonblocking=True, loop=None, **kwargs):
+def upstream(*args, loop=UNSET, **kwargs):
     """
     create a new connection provider
     :param args: connection provider positional arguments
@@ -23,9 +24,9 @@ def upstream(*args, nonblocking=True, loop=None, **kwargs):
     :param kwargs: connection provider keyword arguments
     :return: the new ConnectionProvider
     """
-    if nonblocking:
-        return UpstreamAsync(*args, loop=loop, **kwargs)
-    return UpstreamSync(*args, **kwargs)
+    if loop is not UNSET:
+        return _AsyncUpstream(*args, loop=loop, **kwargs)
+    return _Upstream(*args, **kwargs)
 
 Upstream = upstream
 
@@ -105,7 +106,7 @@ class Connection:
         return self._connection.rollback()
 
 
-class _Upstream:
+class _UpstreamBase:
     """
     Base class for connection providers
     """
@@ -128,7 +129,7 @@ class _Upstream:
         self._servers = []
         extend = self._servers.extend
         for s in servers:
-            extend([ServerInfo(**update_kwargs(s.get('host'), s.get('port')))] * max(int(s.get('count', 1) or 1), 1))
+            extend([ServerInfo(**update_kwargs(s.get('host'), int(s.get('port', 0) or 0)))] * max(int(s.get('count', 1) or 1), 1))
 
         if self._servers:
             random.shuffle(self._servers)
@@ -164,7 +165,7 @@ class _Upstream:
         self._logger.error('Connection to server %s closed: %s.', connection, e)
 
 
-class UpstreamAsync(_Upstream):
+class _AsyncUpstream(_UpstreamBase):
     """
     The asynchronous variant of ConnectionProvider
     """
@@ -195,14 +196,14 @@ class UpstreamAsync(_Upstream):
             info = self._servers[idx]
             if info.penalty < time_:
                 try:
-                    return Connection((yield from websql.connect(nonblocking=True, loop=self._loop, **info.kwargs)), info)
+                    return Connection((yield from websql.connect(loop=self._loop, **info.kwargs)), info)
                 except websql.Error as e:
                     self.invalidate(info, e)
 
         raise RuntimeError('There is no online servers.')
 
 
-class UpstreamSync(_Upstream):
+class _Upstream(_UpstreamBase):
     """
     The synchronous variant of ConnectionProvider
     """
@@ -220,7 +221,7 @@ class UpstreamSync(_Upstream):
             info = self._servers[idx]
             if info.penalty < time_:
                 try:
-                    return Connection(websql.connect(nonblocking=False, **info.kwargs), info)
+                    return Connection(websql.connect(**info.kwargs), info)
                 except websql.Error as e:
                     self.invalidate(info, e)
 

@@ -31,13 +31,13 @@ class TestServerInfo(TestCase):
 
 
 class TestFabric(DatabaseTestCase):
-    def make_upstream(self, servers):  # pragma: no cover
+    def make_upstream(self, servers):
         """abstract method to create a upstream"""
-        raise NotImplementedError
+        return Upstream(servers, DummyLogger, loop=self._context.loop, **self._context.connect_kwargs)
 
-    def make_pool(self, upstream, timeout):  # pragma: no cover
+    def make_pool(self, upstream, timeout):
         """abstract method to create connection pool"""
-        raise NotImplementedError
+        return ConnectionPool(upstream, timeout=timeout, loop=self._context.loop)
 
     def get_insert_request(self, table, error=None):  # pragma: no cover
         """
@@ -234,25 +234,25 @@ class TestFabric(DatabaseTestCase):
     def test_smart_connect(self):
         """test construct smart connect"""
         connection_args = {"master": "localhost:3306#2,localhost#4", "slave": "localhost:3306#2", "database": "test"}
-        connection = smart_connect(connection_args, nonblocking=self._context.nonblocking)
+        connection = smart_connect(connection_args, loop=self._context.loop)
         self.assertIsInstance(connection, Cluster)
         self.assertEqual(6, len(connection._cluster[1]._connection._upstream))
         self.assertEqual(2, len(connection._cluster[0]._connection._upstream))
         connection_args = {"slave": "localhost:3306#2", "database": "test"}
-        self.assertIsInstance(smart_connect(connection_args, nonblocking=self._context.nonblocking), Cluster)
+        self.assertIsInstance(smart_connect(connection_args, loop=self._context.loop), Cluster)
         connection_args = {"master": "localhost:3306#2,localhost#4", "database": "test"}
-        self.assertFalse(isinstance(smart_connect(connection_args, nonblocking=self._context.nonblocking), Cluster))
+        self.assertFalse(isinstance(smart_connect(connection_args, loop=self._context.loop), Cluster))
         connection_args = {}
-        self.assertFalse(isinstance(smart_connect(connection_args, nonblocking=self._context.nonblocking), Cluster))
+        self.assertFalse(isinstance(smart_connect(connection_args, loop=self._context.loop), Cluster))
         connection_args = "master=localhost:3306#2,localhost#4;slave=localhost:3306#2;database=test;"
-        connection = smart_connect(connection_args, nonblocking=self._context.nonblocking)
+        connection = smart_connect(connection_args, loop=self._context.loop)
         self.assertIsInstance(connection, Cluster)
         self.assertEqual(6, len(connection._cluster[1]._connection._upstream))
         self.assertEqual(2, len(connection._cluster[0]._connection._upstream))
         # test real connect
         connection_args = {"master": "%(host)s" % WebSQLSetup.connect_kwargs}
         connection_args.update(WebSQLSetup.connect_kwargs)
-        connection = smart_connect(connection_args, nonblocking=self._context.nonblocking)
+        connection = smart_connect(connection_args, loop=self._context.loop)
         connection.execute(self.wrap_request(lambda x: None))
 
 
@@ -260,14 +260,6 @@ class TestFabricSync(TestFabric):
     @classmethod
     def get_context(cls):
         return WebSQLContextBase(WebSQLSetup())
-
-    def make_upstream(self, servers):
-        """create upstream"""
-        return Upstream(servers, DummyLogger, nonblocking=False, **self._context.connect_kwargs)
-
-    def make_pool(self, upstream, timeout):
-        """create connection pool"""
-        return ConnectionPool(upstream, timeout=timeout, nonblocking=False)
 
     def get_insert_request(self, table, error=None):
         def request(connection):
@@ -307,14 +299,6 @@ class TestFabricAsync(TestFabric):
     @classmethod
     def get_context(cls):
         return WebSQLContextBase(WebSQLSetupAsync())
-
-    def make_upstream(self, servers):
-        """create upstream"""
-        return Upstream(servers, DummyLogger, loop=self._context.loop, nonblocking=True, **self._context.connect_kwargs)
-
-    def make_pool(self, upstream, timeout):
-        """create connection pool"""
-        return ConnectionPool(upstream, timeout=timeout, loop=self._context.loop, nonblocking=True)
 
     def get_insert_request(self, table, error=None):
         @self._context.decorator

@@ -1,6 +1,7 @@
 __author__ = "@bg"
 
 from websql.cursors import INSERT_VALUES
+from websql.connections import UNSET
 from os import getenv
 import _websql
 import asyncio
@@ -32,7 +33,7 @@ class WebSQLSetupBase:
 
 
 class WebSQLSetup(WebSQLSetupBase):
-    nonblocking = False
+    loop = UNSET
 
     @staticmethod
     def decorator(func):
@@ -85,7 +86,6 @@ class WebSQLSetup(WebSQLSetupBase):
 
 
 class WebSQLSetupAsync(WebSQLSetupBase):
-    nonblocking = True
 
     class WrapObject:
         def __init__(self, obj, context):
@@ -134,7 +134,7 @@ class WebSQLSetupAsync(WebSQLSetupBase):
         """
         :return: Future for connection
         """
-        return websql.connect(nonblocking=True, loop=self.loop, **self.connect_kwargs)
+        return websql.connect(loop=self.loop, **self.connect_kwargs)
 
     def wait(self, obj):
         """

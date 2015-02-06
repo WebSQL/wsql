@@ -13,6 +13,8 @@ import _websql
 import asyncio
 import weakref
 
+UNSET = object()
+
 
 __all__ = ['connect', 'Warning', 'Error', 'InterfaceError', 'DatabaseError', 'DataError', 'OperationalError',
            'IntegrityError', 'InternalError', 'ProgrammingError', 'NotSupportedError', 'StandardError']
@@ -30,7 +32,7 @@ NotSupportedError = _websql.exceptions.NotSupportedError
 StandardError = _websql.exceptions.StandardError
 
 
-def connect(*args, nonblocking=None, **kwargs):
+def connect(*args, loop=UNSET, **kwargs):
     """
     Create a connection to the database. It is strongly recommended that
     you only use keyword parameters. Consult the MySQL C API documentation
@@ -92,8 +94,8 @@ def connect(*args, nonblocking=None, **kwargs):
     :return: new coroutine in nonblocking mode and connection otherwise
     """
 
-    if nonblocking:
-        return connection_promise(**kwargs)
+    if loop is not UNSET:
+        return connection_promise(loop=loop, **kwargs)
     return Connection(*args, **kwargs)
 
 
@@ -104,7 +106,7 @@ def connection_promise(*args, sql_mode=None, charset=None, **kwargs):
     for details see connect
     """
 
-    connection = ConnectionAsync(*args, **kwargs)
+    connection = AsyncConnection(*args, **kwargs)
     yield from connection.start()
     connection.setup(charset, sql_mode)
     return connection
@@ -248,7 +250,7 @@ class Connection(ConnectionBase):
         return self._db.ping(reconnect)
 
 
-class ConnectionAsync(ConnectionBase):
+class AsyncConnection(ConnectionBase):
     """The asynchronous connection implementation"""
 
     _Future = asyncio.Future
@@ -264,8 +266,8 @@ class ConnectionAsync(ConnectionBase):
         :param loop: the event loop, Optional, by default the current loop will be used
         :param kwargs: connection keyword arguments, for details see connect
         """
-        from .cursors import CursorAsync
-        super().__init__(CursorAsync, *args, nonblocking=True, **kwargs)
+        from .cursors import AsyncCursor
+        super().__init__(AsyncCursor, *args, nonblocking=True, **kwargs)
         self._loop = asyncio.get_event_loop() if loop is None else loop
         self._server_version = None
 
@@ -440,7 +442,7 @@ class ConnectionAsync(ConnectionBase):
 
     def promise(self, func, *args):
         """
-        Wrap non-blocking call and return promis
+        Wrap non-blocking call and return promise
         :param func: non-blocking function
         :param args: function arguments
         :return: promis

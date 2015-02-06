@@ -23,8 +23,8 @@ def retryable(connection, count=5, delay=1):
     count = count or 1
     loop = getattr(connection, "_loop", None)
     if loop is not None:
-        return RetryableAsync(connection, loop=loop, count=count, delay=delay)
-    return _RetryableSync(connection, count=count, delay=delay)
+        return AsyncRetryable(connection, loop=loop, count=count, delay=delay)
+    return _Retryable(connection, count=count, delay=delay)
 
 
 def transaction(request):
@@ -34,8 +34,8 @@ def transaction(request):
     """
 
     if iscoroutinefunction(request) or iscoroutine(request):
-        return _TransactionScopeAsync(request)
-    return _TransactionScopeSync(request)
+        return _AsyncTransactionScope(request)
+    return _TransactionScope(request)
 
 
 def _is_transaction_scope(connection):
@@ -55,7 +55,7 @@ class TransactionScope:
     pass
 
 
-class _TransactionScopeAsync(TransactionScope):
+class _AsyncTransactionScope(TransactionScope):
     """asynchronous transaction scope"""
 
     def __init__(self, request):
@@ -80,7 +80,7 @@ class _TransactionScopeAsync(TransactionScope):
             _close_transaction(connection)
 
 
-class _TransactionScopeSync(TransactionScope):
+class _TransactionScope(TransactionScope):
     """synchronous transaction scope"""
 
     def __init__(self, request):
@@ -103,7 +103,7 @@ class _TransactionScopeSync(TransactionScope):
             _close_transaction(connection)
 
 
-class RetryableAsync:
+class AsyncRetryable:
     """asynchronous retryable decorator"""
     def __init__(self, connection, count, delay, loop):
         import asyncio
@@ -130,7 +130,7 @@ class RetryableAsync:
         return (yield from self._execute(request, retry_number - 1))
 
 
-class _RetryableSync:
+class _Retryable:
     """synchronous retryable decorator"""
     def __init__(self, connection, count, delay):
         import time
