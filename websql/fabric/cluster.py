@@ -15,15 +15,15 @@ class Cluster:
     def __init__(self, master, slave):
         """
         Construction
-        :param master:  the connection to perform write request
-        :param slave: the connection to perform read requests
+        :param master:  the connection to perform write query
+        :param slave: the connection to perform read querys
         """
         self._cluster = [slave, master]
 
-    def execute(self, request):
+    def execute(self, query):
         """execute handler"""
-        connection = self._cluster[isinstance(request, TransactionScope)]
+        connection = self._cluster[isinstance(query, TransactionScope)]
         if not connection:
             raise NotSupportedError((-1, "the operation is not permitted on read-only cluster"))
 
-        return connection.execute(request)
+        return connection.execute(query)

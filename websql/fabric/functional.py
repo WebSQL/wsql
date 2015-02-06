@@ -27,15 +27,15 @@ def retryable(connection, count=5, delay=1):
     return _Retryable(connection, count=count, delay=delay)
 
 
-def transaction(request):
+def transaction(query):
     """
-    make request transactional
-    :param request: the request
+    make query transactional
+    :param query: the query
     """
 
-    if iscoroutinefunction(request) or iscoroutine(request):
-        return _AsyncTransactionScope(request)
-    return _TransactionScope(request)
+    if iscoroutinefunction(query) or iscoroutine(query):
+        return _AsyncTransactionScope(query)
+    return _TransactionScope(query)
 
 
 def _is_transaction_scope(connection):
@@ -58,18 +58,18 @@ class TransactionScope:
 class _AsyncTransactionScope(TransactionScope):
     """asynchronous transaction scope"""
 
-    def __init__(self, request):
-        self._request = request
+    def __init__(self, query):
+        self._query = query
         self._is_coroutine = True  # For iscoroutinefunction().
 
     @coroutine
     def __call__(self, connection):
         if _is_transaction_scope(connection):
-            return (yield from self._request(connection))
+            return (yield from self._query(connection))
 
         try:
             _begin_transaction(connection)
-            r = yield from self._request(connection)
+            r = yield from self._query(connection)
             yield from connection.commit()
             return r
         except:
@@ -83,16 +83,16 @@ class _AsyncTransactionScope(TransactionScope):
 class _TransactionScope(TransactionScope):
     """synchronous transaction scope"""
 
-    def __init__(self, request):
-        self._request = request
+    def __init__(self, query):
+        self._query = query
 
     def __call__(self, connection):
         if _is_transaction_scope(connection):
-            return self._request(connection)
+            return self._query(connection)
 
         try:
             _begin_transaction(connection)
-            r = self._request(connection)
+            r = self._query(connection)
             connection.commit()
             return r
         except:
@@ -114,20 +114,20 @@ class AsyncRetryable:
         self._loop = loop
         self._sleep = asyncio.sleep
 
-    def execute(self, request):
-        """execute request in current connection"""
-        return self._execute(request, self._count - 1)
+    def execute(self, query):
+        """execute query in current connection"""
+        return self._execute(query, self._count - 1)
 
     @coroutine
-    def _execute(self, request, retry_number):
-        """internal method to execute request with retry-count check"""
+    def _execute(self, query, retry_number):
+        """internal method to execute query with retry-count check"""
         try:
-            return (yield from self._connection.execute(request))
+            return (yield from self._connection.execute(query))
         except Exception as e:
             if retry_number <= 0 or not _websql.exceptions.is_retryable(e):
                 raise
         yield from self._sleep(self._delay, loop=self._loop)
-        return (yield from self._execute(request, retry_number - 1))
+        return (yield from self._execute(query, retry_number - 1))
 
 
 class _Retryable:
@@ -139,16 +139,16 @@ class _Retryable:
         self._delay = delay
         self._sleep = time.sleep
 
-    def execute(self, request):
-        """execute request in current connection"""
-        return self._execute(request, self._count - 1)
+    def execute(self, query):
+        """execute query in current connection"""
+        return self._execute(query, self._count - 1)
 
-    def _execute(self, request, retry_number):
+    def _execute(self, query, retry_number):
         try:
-            return self._connection.execute(request)
+            return self._connection.execute(query)
         except Exception as e:
             if retry_number <= 0 or not _websql.exceptions.is_retryable(e):
                 raise
 
         self._sleep(self._delay)
-        return self._execute(request, retry_number - 1)
+        return self._execute(query, retry_number - 1)

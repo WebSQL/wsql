@@ -83,13 +83,13 @@ class Connection:
         """
         return self._meta
 
-    def execute(self, request):
+    def execute(self, query):
         """
         execute the database query
-        :param request: - the callable object, that implement logic to query database
-        :return the result of request
+        :param query: - the callable object, that implement logic to query database
+        :return the result of query
         """
-        return request(self)
+        return query(self)
 
     def cursor(self):
         """

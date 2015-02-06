@@ -100,15 +100,15 @@ class _AsyncConnectionPool(_ConnectionPoolBase):
         return (yield from wait_for(next(self._upstream), timeout=self._timeout, loop=self._loop))
 
     @coroutine
-    def execute(self, request):
+    def execute(self, query):
         """
         execute the database query on connection pool
-        :param request: - the callable object, that implement logic to query database
-        :return the response to request
+        :param query: - the callable object, that implement logic to query database
+        :return the response to query
         """
         connection = yield from self._acquire()
         try:
-            return (yield from connection.execute(request))
+            return (yield from connection.execute(query))
         finally:
             self._release(connection)
 
@@ -159,14 +159,14 @@ class _ConnectionPool(_ConnectionPoolBase):
         except self.QueueEmpty:
             raise self.TimeoutError from None
 
-    def execute(self, request):
+    def execute(self, query):
         """
         execute the database query on connection pool
-        :param request: - the callable object, that implement logic to query database
-        :return the response to request
+        :param query: - the callable object, that implement logic to query database
+        :return the response to query
         """
         connection = self._acquire()
         try:
-            return connection.execute(request)
+            return connection.execute(query)
         finally:
             self._release(connection)
