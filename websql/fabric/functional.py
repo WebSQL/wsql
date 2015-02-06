@@ -5,22 +5,13 @@ WebSQL Scope Objects
 This module implements scope objects for connections.
 """
 
-from asyncio import iscoroutine, iscoroutinefunction, coroutine, get_event_loop
+from asyncio import iscoroutine, iscoroutinefunction, coroutine
 import _websql
 
 __all__ = ["transaction", "retryable"]
 
 
-def nonblocking(cls):
-    cls._nonblocking = True
-    return cls
-
-
-def is_nonblocking(cls):
-    return getattr(cls, '_nonblocking', False)
-
-
-def retryable(connection, count=5, delay=1, loop=None):
+def retryable(connection, count=5, delay=1):
     """
     Make connection execute retryable
     :param connection: the connection object
@@ -30,7 +21,8 @@ def retryable(connection, count=5, delay=1, loop=None):
     :return: the Connection, that has retryable method execute
     """
     count = count or 1
-    if is_nonblocking(connection):
+    loop = getattr(connection, "_loop", None)
+    if loop is not None:
         return RetryableAsync(connection, loop=loop, count=count, delay=delay)
     return _RetryableSync(connection, count=count, delay=delay)
 
@@ -119,7 +111,7 @@ class RetryableAsync:
         self._connection = connection
         self._count = count
         self._delay = delay
-        self._loop = loop or get_event_loop()
+        self._loop = loop
         self._sleep = asyncio.sleep
 
     def execute(self, request):

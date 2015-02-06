@@ -4,18 +4,18 @@ WebSQL Connection Provider
 
 This module implements connections pools for WebSQL.
 """
-
-from .functional import nonblocking as _nonblocking
-from asyncio import coroutine
-from time import monotonic
+import random
 import websql
 import sys
 
+from asyncio import coroutine
+from time import monotonic
 
-__all__ = ["ConnectionProvider"]
+
+__all__ = ["Upstream"]
 
 
-def connection_provider(*args, nonblocking=True, **kwargs):
+def upstream(*args, nonblocking=True, **kwargs):
     """
     create a new connection provider
     :param args: connection provider positional arguments
@@ -24,14 +24,14 @@ def connection_provider(*args, nonblocking=True, **kwargs):
     :return: the new ConnectionProvider
     """
     if nonblocking:
-        return ConnectionProviderAsync(*args, **kwargs)
-    return ConnectionProviderSync(*args, **kwargs)
+        return UpstreamAsync(*args, **kwargs)
+    return UpstreamSync(*args, **kwargs)
 
-ConnectionProvider = connection_provider
+Upstream = upstream
 
 
 class ServerInfo:
-    def __init__(self, kwargs):
+    def __init__(self, **kwargs):
         """
         :param kwargs: native connection arguments
         """
@@ -45,8 +45,9 @@ class ServerInfo:
             return self.kwargs.get('socket_name', 'default')
 
 
-class ConnectionHolder:
-    """connection holder"""
+class Connection:
+    """database client"""
+
     def __init__(self, connection, meta=None):
         """
         :param connection: the native connection to database
@@ -55,17 +56,16 @@ class ConnectionHolder:
         self._connection = connection
         self._meta = meta
 
+    @property
+    def _loop(self):
+        """to support retryable operations"""
+        return getattr(self._connection, '_loop')
+
     def connection(self):
         """
         :return: the native connection
         """
         return self._connection
-
-    def cursor(self):
-        """
-        an alias for connection.cursor()
-        """
-        return self._connection.cursor()
 
     @property
     def connected(self):
@@ -82,30 +82,6 @@ class ConnectionHolder:
         """
         return self._meta
 
-
-@_nonblocking
-class ConnectionHolderAsync(ConnectionHolder):
-    @coroutine
-    def execute(self, request):
-        """
-        execute the database query
-        :param request: - the callable object, that implement logic to query database
-        :return the result of request
-        """
-        return (yield from request(self))
-
-    @coroutine
-    def commit(self):
-        """an alias for connection.commit()"""
-        return (yield from self._connection.commit())
-
-    @coroutine
-    def rollback(self):
-        """an alias for connection.rollback()"""
-        return (yield from self._connection.rollback())
-
-
-class ConnectionHolderSync(ConnectionHolder):
     def execute(self, request):
         """
         execute the database query
@@ -113,6 +89,12 @@ class ConnectionHolderSync(ConnectionHolder):
         :return the result of request
         """
         return request(self)
+
+    def cursor(self):
+        """
+        an alias for connection.cursor()
+        """
+        return self._connection.cursor()
 
     def commit(self):
         """an alias for connection.commit()"""
@@ -123,21 +105,43 @@ class ConnectionHolderSync(ConnectionHolder):
         return self._connection.rollback()
 
 
-class _ConnectionProviderBase:
+class _Upstream:
     """
     Base class for connection providers
     """
-    def __init__(self, servers, logger):
+
+    def __init__(self, servers, logger, **kwargs):
         """
         Constructor
-        :param servers: the list of ServerInfo objects
+        :param servers: the list of servers
         :param logger: the logger object
+        :param kwargs: the connection arguments
         """
-        self._servers = [ServerInfo(x) for x in servers]
+        def update_kwargs(host, port):
+            kw = kwargs.copy()
+            if host:
+                kw["host"] = host
+            if port:
+                kw["port"] = port
+            return kw
+
+        self._servers = []
+        extend = self._servers.extend
+        for s in servers:
+            extend([ServerInfo(**update_kwargs(s.get('host'), s.get('port')))] * max(int(s.get('count', 1) or 1), 1))
+
+        if self._servers:
+            random.shuffle(self._servers)
+        else:
+            self._servers.append(ServerInfo(**kwargs))
+
         self._logger = logger
         self.current = 0
-        self.max = len(servers)
+        self.count = len(self._servers)
         self.penalty = 60  # 1 min
+
+    def __len__(self):
+        return self.count
 
     def invalidate(self, connection, e=None):
         """
@@ -146,7 +150,7 @@ class _ConnectionProviderBase:
         :param connection: the connection object, that contains meta information
         """
 
-        if isinstance(connection, ConnectionHolder):
+        if isinstance(connection, Connection):
             info = connection.meta
         elif isinstance(connection, ServerInfo):
             info = connection
@@ -160,34 +164,26 @@ class _ConnectionProviderBase:
         self._logger.error('Connection to server %s closed: %s.', connection, e)
 
 
-@_nonblocking
-class ConnectionProviderAsync(_ConnectionProviderBase):
+class UpstreamAsync(_Upstream):
     """
     The asynchronous variant of ConnectionProvider
     """
 
-    def __init__(self, servers, logger, loop=None):
+    def __init__(self, servers, logger, loop=None, **kwargs):
         """
         Constructor
         :param servers: the list of ServerInfo objects
         :param logger: the logger object
         :param loop: the event loop
         """
-        super().__init__(servers, logger)
+        super().__init__(servers, logger, **kwargs)
         self._loop = loop
 
-    @staticmethod
-    def make_connection(connection, info):
-        """
-        Attach meta info to connection
-        :param connection: the connection object
-        :param info: the server info
-        :return: the connection object
-        """
-        return ConnectionHolderAsync(connection, info)
+    def __next__(self):
+        return self._next()
 
     @coroutine
-    def connect(self):
+    def _next(self):
         """
         Create a new connection to database, try one by one all servers.
         if there is no online servers the RuntimeError will be raised
@@ -195,33 +191,23 @@ class ConnectionProviderAsync(_ConnectionProviderBase):
         """
         current = self.current
         time_ = monotonic()
-        for idx in ((i + current) % self.max for i in range(self.max)):
+        for idx in ((i + current) % self.count for i in range(self.count)):
             info = self._servers[idx]
             if info.penalty < time_:
                 try:
-                    return self.make_connection((yield from websql.connect(nonblocking=True, loop=self._loop, **info.kwargs)), info)
+                    return Connection((yield from websql.connect(nonblocking=True, loop=self._loop, **info.kwargs)), info)
                 except websql.Error as e:
                     self.invalidate(info, e)
 
         raise RuntimeError('There is no online servers.')
 
 
-class ConnectionProviderSync(_ConnectionProviderBase):
+class UpstreamSync(_Upstream):
     """
     The synchronous variant of ConnectionProvider
     """
 
-    @staticmethod
-    def make_connection(connection, info):
-        """
-        Attach meta info to connection
-        :param connection: the connection object
-        :param info: the server info
-        :return: the connection object
-        """
-        return ConnectionHolderSync(connection, info)
-
-    def connect(self):
+    def __next__(self):
         """
         Create a new connection to database, try one by one all servers.
         if there is no online servers the RuntimeError will be raised
@@ -230,11 +216,11 @@ class ConnectionProviderSync(_ConnectionProviderBase):
 
         current = self.current
         time_ = monotonic()
-        for idx in ((i + current) % self.max for i in range(self.max)):
+        for idx in ((i + current) % self.count for i in range(self.count)):
             info = self._servers[idx]
             if info.penalty < time_:
                 try:
-                    return self.make_connection(websql.connect(nonblocking=False, **info.kwargs), info)
+                    return Connection(websql.connect(nonblocking=False, **info.kwargs), info)
                 except websql.Error as e:
                     self.invalidate(info, e)
 

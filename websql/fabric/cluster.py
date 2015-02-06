@@ -4,6 +4,7 @@
 __author__ = "Bulat Gaifullin (bulat.gaifullin@acronis.com)"
 
 from .functional import TransactionScope
+from websql import NotSupportedError
 
 __all__ = ["Cluster"]
 
@@ -11,15 +12,18 @@ __all__ = ["Cluster"]
 class Cluster:
     """asynchronous commutator"""
 
-    def __init__(self, read_connection, write_connection):
+    def __init__(self, master, slave):
         """
         Construction
-        :param read_connection:  the connection to perform read requests
-        :param write_connection: the connection to perform write requests
+        :param master:  the connection to perform write request
+        :param slave: the connection to perform read requests
         """
-        self.__cluster = [read_connection, write_connection]
+        self._cluster = [slave, master]
 
     def execute(self, request):
         """execute handler"""
+        connection = self._cluster[isinstance(request, TransactionScope)]
+        if not connection:
+            raise NotSupportedError((-1, "the operation is not permitted on read-only cluster"))
 
-        return self.__cluster[isinstance(request, TransactionScope)].execute(request)
+        return connection.execute(request)

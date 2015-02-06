@@ -3,6 +3,7 @@
 __author__ = "@bg"
 __unittest = True
 
+
 from unittest import TestCase
 from time import time
 
@@ -12,7 +13,7 @@ class DatabaseTestCase(TestCase):
 
     @classmethod
     def get_context(cls):
-        pass
+        pass  # pragma: no cover
 
     @classmethod
     def _setup_cls(cls):
@@ -64,7 +65,7 @@ class DatabaseTestCase(TestCase):
         cursor = self._context.cursor()
 
         table = self._unique_name('table')
-        if self._context.debug:
+        if self._context.debug:  # pragma: no cover
             print('table name %s' % table)
         self.tables.append(table)
 
@@ -77,7 +78,7 @@ class DatabaseTestCase(TestCase):
         if generator is not None:
             insert_statement = ('INSERT INTO %s VALUES (%s)' % (table, ','.join(['%s'] * len(columns))))
             data = [[generator(i, j) for j in range(len(columns))] for i in range(self._context.rows)]
-            if self._context.debug:
+            if self._context.debug:  # pragma: no cover
                 print(data)
             cursor.executemany(insert_statement, data)
             connection.commit()

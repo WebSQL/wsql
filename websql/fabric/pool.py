@@ -5,14 +5,13 @@ WebSQL Connection Pool
 This module implements connections pools for WebSQL.
 """
 
-from .functional import nonblocking as _nonblocking
 from asyncio import coroutine, wait_for
 
 
 __all__ = ["ConnectionPool"]
 
 
-def connection_poll(*args, nonblocking=True, **kwargs):
+def connection_poll(*args, nonblocking=True, loop=None, **kwargs):
     """
     create a new connection pool
     :param args: connection pool positional arguments
@@ -22,7 +21,7 @@ def connection_poll(*args, nonblocking=True, **kwargs):
     """
 
     if nonblocking:
-        return ConnectionPoolAsync(*args, **kwargs)
+        return ConnectionPoolAsync(*args, loop=loop, **kwargs)
     return ConnectionPoolSync(*args, **kwargs)
 
 ConnectionPool = connection_poll
@@ -33,11 +32,11 @@ class _ConnectionPoolBase:
         Base class for connection pools
     """
 
-    def __init__(self, provider, queue, timeout=None):
+    def __init__(self, upstream, queue, timeout=None):
         """
         Constructor
-        :param provider: factory to create a new connection
-        :type provider: ConnectionProvider
+        :param upstream: factory to create a new connection
+        :type upstream: websql.fabric.Upstream
         :param queue: the queue to store connections
         :type queue: Queue
         :param timeout: the timeout in seconds to acquire new connection
@@ -45,7 +44,7 @@ class _ConnectionPoolBase:
         """
         assert queue.maxsize
 
-        self._provider = provider
+        self._upstream = upstream
         self._queue = queue
         self._reserve = queue.maxsize
         self._timeout = timeout
@@ -59,27 +58,25 @@ class _ConnectionPoolBase:
             self._queue.put_nowait(connection)
         else:
             self._reserve += 1
-            self._provider.invalidate(connection)
+            self._upstream.invalidate(connection)
 
 
-@_nonblocking
 class ConnectionPoolAsync(_ConnectionPoolBase):
     """
         Asynchronous connection pool
         the connections will be created on demand
     """
 
-    def __init__(self, provider, size, loop=None, timeout=None):
+    def __init__(self, upstream, loop=None, timeout=None):
         """
         Initialize pool
-        :param provider: coroutine to create a new connection
-        :param size: the pool size
+        :param upstream: the upstream
         :param loop: the event loop, by default current event loop will be used
         """
         from asyncio.queues import Queue, QueueEmpty
         from asyncio import TimeoutError, get_event_loop
 
-        super().__init__(provider, Queue(size, loop=loop), timeout=timeout)
+        super().__init__(upstream, Queue(len(upstream), loop=loop), timeout=timeout)
         self._loop = loop or get_event_loop()
         self.QueueEmpty = QueueEmpty
         self.TimeoutError = TimeoutError
@@ -99,7 +96,7 @@ class ConnectionPoolAsync(_ConnectionPoolBase):
             return (yield from wait_for(self._queue.get(), timeout=self._timeout, loop=self._loop))
 
         self._reserve -= 1
-        return (yield from wait_for(self._provider.connect(), timeout=self._timeout, loop=self._loop))
+        return (yield from wait_for(next(self._upstream), timeout=self._timeout, loop=self._loop))
 
     @coroutine
     def execute(self, request):
@@ -123,17 +120,16 @@ class ConnectionPoolSync(_ConnectionPoolBase):
 
     TimeoutError = TimeoutError
 
-    def __init__(self, provider, size, timeout=None):
+    def __init__(self, upstream, timeout=None):
         """
         Initialize pool
-        :param provider: method to create a new connection
-        :param size: the pool size
+        :param upstream: the upstream
         :param timeout: the timeout to create a new connection
         """
         from queue import Queue, Empty
         from threading import Lock
 
-        super().__init__(provider, Queue(size), timeout=timeout)
+        super().__init__(upstream, Queue(len(upstream)), timeout=timeout)
         self._lock = Lock()
         self.QueueEmpty = Empty
 
@@ -155,7 +151,7 @@ class ConnectionPoolSync(_ConnectionPoolBase):
                 can_create = True
 
         if can_create:
-            return self._provider.connect()
+            return next(self._upstream)
 
         try:
             return self._queue.get(timeout=self._timeout)

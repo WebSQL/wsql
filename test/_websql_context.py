@@ -38,7 +38,7 @@ class WebSQLSetup(WebSQLSetupBase):
         return func
 
     @staticmethod
-    def iscoroutine(_):
+    def iscoroutine(_):  # pragma: no cover
         return False
 
     def connect(self):

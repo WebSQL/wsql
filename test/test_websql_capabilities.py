@@ -3,7 +3,7 @@ __author__ = "@bg"
 try:
     from _capabilities import CapabilityTestCases
     from _websql_context import WebSQLContext, WebSQLAsyncContext
-except ImportError:
+except ImportError:  # pragma: no cover
     from ._capabilities import CapabilityTestCases
     from ._websql_context import WebSQLContext, WebSQLAsyncContext
 

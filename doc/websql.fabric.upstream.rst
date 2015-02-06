@@ -1,7 +1,7 @@
-websql.fabric.provider module
+websql.fabric.upstream module
 =============================
 
-.. automodule:: websql.fabric.provider
+.. automodule:: websql.fabric.upstream
     :members:
     :undoc-members:
     :show-inheritance:

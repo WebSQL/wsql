@@ -8,7 +8,7 @@ __unittest = True
 
 try:
     from _case import DatabaseTestCase
-except ImportError:
+except ImportError:  # pragma: no cover
     from ._case import DatabaseTestCase
 
 from datetime import timedelta
@@ -83,7 +83,7 @@ class CapabilityTestCases(DatabaseTestCase):
         """test TINYINT"""
         def generator(row, col):
             v = (row * col) * 20 % 256
-            if v > 127:
+            if v > 127:  # pragma: no cover
                 v -= 256
             return v
 
@@ -172,7 +172,7 @@ class CapabilityTestCases(DatabaseTestCase):
 
         if self._context.connection()._server_version >= (5, 6):
             self._check_data_integrity(('col1 TIMESTAMP(2)',), generator)
-        else:
+        else:  # pragma: no cover
             self._check_data_integrity(('col1 TIMESTAMP',), generator)
 
     def test_bool(self):
@@ -188,7 +188,7 @@ class CapabilityTestCases(DatabaseTestCase):
         def generator(row, col):
             if row == col:
                 return set(choises)
-            if row < col:
+            if row < col:  # pragma: no cover
                 return set(choises[row:col])
             return set(choises[col:row])
 
@@ -232,7 +232,7 @@ class CapabilityTestCases(DatabaseTestCase):
             cursor.execute("describe some_non_existent_table")
         except self._context.module.ProgrammingError as e:
             self.assertEqual(self._context.constants.ER_NO_SUCH_TABLE, e.code)
-        else:
+        else:  # pragma: no cover
             self.fail('ProgrammingError should be raised!')
 
     def test_insert_values(self):
@@ -292,11 +292,11 @@ class CapabilityTestCases(DatabaseTestCase):
         try:
             cursor.execute(insert_statement, (0, '0' * 256))
         except Warning:
-            if self._context.debug:
+            if self._context.debug:  # pragma: no cover
                 print(cursor.messages)
         except self._context.module.DataError:
             pass
-        else:
+        else:  # pragma: no cover
             self.fail("Over-long column did not generate warnings/exception with single insert")
 
         connection.rollback()
@@ -308,11 +308,11 @@ class CapabilityTestCases(DatabaseTestCase):
                     data.append(generator(i, j))
                 cursor.execute(insert_statement, tuple(data))
         except Warning:
-            if self._context.debug:
+            if self._context.debug:   # pragma: no cover
                 print(cursor.messages)
         except self._context.module.DataError:
             pass
-        else:
+        else:  # pragma: no cover
             self.fail("Over-long columns did not generate warnings/exception with execute()")
 
         connection.rollback()
@@ -321,11 +321,11 @@ class CapabilityTestCases(DatabaseTestCase):
             data = [[generator(i, j) for j in range(len(columndefs))] for i in range(self._context.rows)]
             cursor.executemany(insert_statement, data)
         except Warning:
-            if self._context.debug:
+            if self._context.debug:  # pragma: no cover
                 print(cursor.messages)
         except self._context.module.DataError:
             pass
-        else:
+        else:  # pragma: no cover
             self.fail("Over-long columns did not generate warnings/exception with executemany()")
 
         connection.rollback()

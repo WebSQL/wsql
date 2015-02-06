@@ -5,7 +5,7 @@ __author__ = "@bg"
 try:
     from _dbapi20 import DatabaseAPI20TestCases
     from _websql_context import WebSQLContext, WebSQLAsyncContext
-except ImportError:
+except ImportError:  # pragma: no cover
     from ._dbapi20 import DatabaseAPI20TestCases
     from ._websql_context import WebSQLContext, WebSQLAsyncContext
 

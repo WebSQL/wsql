@@ -30,11 +30,16 @@ bool is_retryable_error(int error_code)
     /// connection error
     if (error_code >= CR_SOCKET_CREATE_ERROR && error_code <= CR_SERVER_GONE_ERROR)
         return true;
-    /// lost connection or dead-lock
+    /// lost connection
     if (error_code == CR_SERVER_LOST || error_code == ER_LOCK_DEADLOCK)
         return true;
 
     return false;
+}
+
+bool is_deadlock(int error_code)
+{
+    return error_code == ER_LOCK_DEADLOCK;
 }
 
 PyObject*
@@ -86,24 +91,42 @@ _mysql_exception(_mysql_connection_object *c)
     return _mysql_set_exception(NULL, error_code, mysql_error(&(c->connection)));
 }
 
+PyObject *
+_mysql_check_error_code(PyObject* args, bool (*checker)(int))
+{
+    int result = 0;
+    PyObject* exception;
+
+    if (!PyArg_ParseTuple(args, "O", &exception))
+        return NULL;
+
+    if (PyObject_IsInstance(exception, _mysql_error)) {
+        PyObject* code = PyObject_GetAttrString(exception, "code");
+        if (code && checker(PyLong_AsLong(code))) {
+            result = 1;
+        }
+        Py_XDECREF(code);
+    }
+    return PyBool_FromLong(result);
+}
+
 const char _mysql_is_retryable_error__doc__[] =
 "Return True if error is retryable, otherwise False\n";
 
 PyObject *
 _mysql_is_retryable_error(PyObject* self, PyObject* args)
 {
-    int result = 0;
-    PyObject* exc;
+    return _mysql_check_error_code(args, &is_retryable_error);
+}
 
-    if (!PyArg_ParseTuple(args, "O", &exc))
-        return NULL;
 
-    if (PyObject_IsInstance(exc, _mysql_error)) {
-        PyObject* code = PyObject_GetAttrString(exc, "code");
-        if (code && is_retryable_error(PyLong_AsLong(code)))
-            result = 1;
-    }
-    return PyBool_FromLong(result);
+const char _mysql_is_deadlock_error__doc__[] =
+"Return True if error means dead-lock, otherwise False\n";
+
+PyObject *
+_mysql_is_deadlock_error(PyObject* self, PyObject* args)
+{
+    return _mysql_check_error_code(args, &is_deadlock);
 }
 
 
@@ -117,6 +140,12 @@ _mysql_exceptions_methods[] = {
         (PyCFunction)_mysql_is_retryable_error,
         METH_VARARGS,
         _mysql_is_retryable_error__doc__
+    },
+    {
+        "is_deadlock",
+        (PyCFunction)_mysql_is_deadlock_error,
+        METH_VARARGS,
+        _mysql_is_deadlock_error__doc__
     },
     {NULL, NULL} /* sentinel */
 };

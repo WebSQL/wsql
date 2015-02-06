@@ -8,7 +8,7 @@ Submodules
 
    websql.fabric.functional
    websql.fabric.pool
-   websql.fabric.provider
+   websql.fabric.upstream
 
 Module contents
 ---------------

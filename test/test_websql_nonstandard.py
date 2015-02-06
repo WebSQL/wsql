@@ -3,7 +3,7 @@
 try:
     from _case import DatabaseTestCase, TestCase
     from _websql_context import WebSQLSetup, WebSQLSetupAsync, WebSQLContextBase
-except ImportError:
+except ImportError:  # pragma: no cover
     from ._case import DatabaseTestCase, TestCase
     from ._websql_context import WebSQLSetup, WebSQLSetupAsync, WebSQLContextBase
 
@@ -130,7 +130,7 @@ class TestCursorBase(DatabaseTestCase):
         with warnings.catch_warnings(record=True) as records:
             try:
                 func(*args)
-            except Warning as w:
+            except Warning as w:  # pragma: no cover
                 records.append(w)
             if message is not None:
                 self.assertEqual(1, len(records))
