@@ -195,8 +195,7 @@ class TestFabric(DatabaseTestCase):
         table = self._create_table(('name VARCHAR(10)',), None)
 
         connection_holder = Connection(self._context.make_connection())
-        request = self.wrap_request(transaction(self.get_insert_request(table)))
-
+        request = transaction(self.get_insert_request(table))
         connection_holder.commit = self.count_calls(connection_holder.commit)
         connection_holder.commit.call_count = 0
         self._context.wait(connection_holder.execute(transaction(request)))
@@ -339,9 +338,6 @@ class TestFabricAsync(TestFabric):
             return None
         request.call_count = 0
         return request
-
-    def test_commit(self):
-        super().test_commit()
 
 del TestFabric
 
