@@ -88,9 +88,7 @@ def connect(*args, loop=UNSET, **kwargs):
     :type ssl: dict|mapping
     :param local_infile: integer, non-zero enables LOAD LOCAL INFILE; zero disables
     :type local_infile: bool
-    :param nonblocking: if set, will be used asynchronous API,
-                        If this is set, and client does not support non-blocking, NotSupportedError will be raised.
-    :type nonblocking: bool
+    :param loop: the event-loop, if specified the asynchronous connection will be created
     :return: new coroutine in nonblocking mode and connection otherwise
     """
 
