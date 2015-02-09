@@ -14,7 +14,7 @@ from .exception import *
 from websql.connections import UNSET
 
 
-def smart_connect(connection_args, loop=UNSET, logger=None):
+def connect(connection_args, loop=UNSET, logger=None):
     """
     connection_args format:
     uri=[dbcs?:://]hostname[:port]#count"

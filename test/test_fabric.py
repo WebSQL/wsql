@@ -11,7 +11,7 @@ except ImportError:  # pragma: no cover
     from ._websql_context import WebSQLSetup, WebSQLSetupAsync, WebSQLContextBase
 
 from unittest import TestCase
-from websql.fabric import ConnectionPool, Upstream, transaction, retryable, Cluster, smart_connect
+from websql.fabric import ConnectionPool, Upstream, transaction, retryable, Cluster, connect
 from websql.fabric.upstream import ServerInfo, Connection
 from websql.fabric import exception
 
@@ -233,25 +233,25 @@ class TestFabric(DatabaseTestCase):
     def test_smart_connect(self):
         """test construct smart connect"""
         connection_args = {"master": "localhost:3306#2,localhost#4", "slave": "localhost:3306#2", "database": "test"}
-        connection = smart_connect(connection_args, loop=self._context.loop)
+        connection = connect(connection_args, loop=self._context.loop)
         self.assertIsInstance(connection, Cluster)
         self.assertEqual(6, len(connection._cluster[1]._connection._upstream))
         self.assertEqual(2, len(connection._cluster[0]._connection._upstream))
         connection_args = {"slave": "localhost:3306#2", "database": "test"}
-        self.assertIsInstance(smart_connect(connection_args, loop=self._context.loop), Cluster)
+        self.assertIsInstance(connect(connection_args, loop=self._context.loop), Cluster)
         connection_args = {"master": "localhost:3306#2,localhost#4", "database": "test"}
-        self.assertFalse(isinstance(smart_connect(connection_args, loop=self._context.loop), Cluster))
+        self.assertFalse(isinstance(connect(connection_args, loop=self._context.loop), Cluster))
         connection_args = {}
-        self.assertFalse(isinstance(smart_connect(connection_args, loop=self._context.loop), Cluster))
+        self.assertFalse(isinstance(connect(connection_args, loop=self._context.loop), Cluster))
         connection_args = "master=localhost:3306#2,localhost#4;slave=localhost:3306#2;database=test;"
-        connection = smart_connect(connection_args, loop=self._context.loop)
+        connection = connect(connection_args, loop=self._context.loop)
         self.assertIsInstance(connection, Cluster)
         self.assertEqual(6, len(connection._cluster[1]._connection._upstream))
         self.assertEqual(2, len(connection._cluster[0]._connection._upstream))
         # test real connect
         connection_args = {"master": "%(host)s" % WebSQLSetup.connect_kwargs}
         connection_args.update(WebSQLSetup.connect_kwargs)
-        connection = smart_connect(connection_args, loop=self._context.loop)
+        connection = connect(connection_args, loop=self._context.loop)
         connection.execute(self.wrap_query(lambda x: None))
 
 
