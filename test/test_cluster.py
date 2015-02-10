@@ -11,9 +11,9 @@ except ImportError:  # pragma: no cover
     from ._websql_context import WebSQLSetup, WebSQLSetupAsync, WebSQLContextBase
 
 from unittest import TestCase
-from websql.fabric import ConnectionPool, Upstream, transaction, retryable, Cluster, connect
-from websql.fabric.upstream import ServerInfo, Connection
-from websql.fabric import exception
+from websql.cluster import ConnectionPool, Upstream, transaction, retryable, Cluster, connect
+from websql.cluster.upstream import ServerInfo, Connection
+from websql.cluster import exception
 
 
 class DummyLogger:
