@@ -7,17 +7,33 @@ WebSQL
     :target: https://coveralls.io/r/WebSQL/websql?branch=master
 
 
-WebSQL is an asynchronous python connector to the popular MySQL_ database server based on WebScaleSQL_.
+WebSQL is an asynchronous python connector to the popular `MySQL`_ database server based on `WebScaleSQL`_.
 The design goals are:
     - Compatibility with Python3 asyncio package
-    - Compliance with Python database API version 2.0 [PEP-0249]_
+    - Compliance with Python database API version 2.0 `[PEP-0249]`_
     - Thread-safety
     - Thread-friendliness (threads will not block each other)
+    - Support mysql-clusters like: `Percona-XtraDB-Cluster`_, `GaleraCluster`_
+    
+
+.. code:: python
+
+    import websql.cluster.connect
+    # master:master(active:active)
+    connection = websql.cluster.connect("master=localhost:3305#2,localhost:3306#2", database="test")
+    # master:slave(active:passive)
+    connection = websql.cluster.connect("master=localhost;slave=localhost:3307#4", database="test")
+    # read-only
+    connection = websql.cluster.connect("slave=localhost:3307#4;database=test;")
+
 
 MySQL-5.5 and newer and Python-3.4 and newer are currently supported.
 
 WebSQL is `Free Software`_.
-.. _MySQL: http://www.mysql.com/
+
+.. _`MySQL`: http://www.mysql.com/
 .. _`Free Software`: http://www.gnu.org/
-.. _WebScaleSQL: http://webscalesql.org/
-.. [PEP-0249] http://www.python.org/peps/pep-0249.html
+.. _`WebScaleSQL`: http://webscalesql.org/
+.. _`[PEP-0249]`: http://www.python.org/peps/pep-0249.html
+.. _`Percona-XtraDB-Cluster`: http://www.percona.com/software/percona-xtradb-cluster
+.. _`GaleraCluster`: http://galeracluster.com/products/
