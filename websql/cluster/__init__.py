@@ -9,7 +9,6 @@ from .cluster import *
 from .pool import *
 from .upstream import *
 from .functional import *
-from .exception import *
 
 from websql.connections import UNSET
 

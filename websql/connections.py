@@ -8,7 +8,9 @@ create Connection directly; use connect method instead.
 """
 
 __author = "@bg"
+
 from .converters import default_decoders, default_encoders, default_row_formatter
+from .import exceptions
 import _websql
 import asyncio
 import weakref
@@ -16,20 +18,7 @@ import weakref
 UNSET = object()
 
 
-__all__ = ['connect', 'Warning', 'Error', 'InterfaceError', 'DatabaseError', 'DataError', 'OperationalError',
-           'IntegrityError', 'InternalError', 'ProgrammingError', 'NotSupportedError', 'StandardError']
-
-Warning = _websql.exceptions.Warning
-Error = _websql.exceptions.Error
-InterfaceError = _websql.exceptions.InterfaceError
-DatabaseError = _websql.exceptions.DatabaseError
-DataError = _websql.exceptions.DataError
-OperationalError = _websql.exceptions.OperationalError
-IntegrityError = _websql.exceptions.IntegrityError
-InternalError = _websql.exceptions.InternalError
-ProgrammingError = _websql.exceptions.ProgrammingError
-NotSupportedError = _websql.exceptions.NotSupportedError
-StandardError = _websql.exceptions.StandardError
+__all__ = ['connect']
 
 
 def connect(*args, loop=UNSET, **kwargs):
@@ -114,16 +103,16 @@ class ConnectionBase(object):
     """
     Base class for connection implementations
     """
-    Error = _websql.exceptions.Error
-    InterfaceError = _websql.exceptions.InterfaceError
-    DatabaseError = _websql.exceptions.DatabaseError
-    DataError = _websql.exceptions.DataError
-    OperationalError = _websql.exceptions.OperationalError
-    IntegrityError = _websql.exceptions.IntegrityError
-    InternalError = _websql.exceptions.InternalError
-    ProgrammingError = _websql.exceptions.ProgrammingError
-    NotSupportedError = _websql.exceptions.NotSupportedError
-    Warning = _websql.exceptions.Warning
+    Error = exceptions.Error
+    InterfaceError = exceptions.InterfaceError
+    DatabaseError = exceptions.DatabaseError
+    DataError = exceptions.DataError
+    OperationalError = exceptions.OperationalError
+    IntegrityError = exceptions.IntegrityError
+    InternalError = exceptions.InternalError
+    ProgrammingError = exceptions.ProgrammingError
+    NotSupportedError = exceptions.NotSupportedError
+    Warning = exceptions.Warning
 
     _db = None
 

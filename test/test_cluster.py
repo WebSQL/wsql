@@ -1,6 +1,7 @@
 """
 Tests Connection Pools
 """
+
 __author__ = "@bg"
 
 try:
@@ -11,9 +12,9 @@ except ImportError:  # pragma: no cover
     from ._websql_context import WebSQLSetup, WebSQLSetupAsync, WebSQLContextBase
 
 from unittest import TestCase
+from websql import exceptions
 from websql.cluster import ConnectionPool, Upstream, transaction, retryable, Cluster, connect
 from websql.cluster.upstream import ServerInfo, Connection
-from websql.cluster import exception
 
 
 class DummyLogger:
@@ -322,7 +323,7 @@ class TestFabricAsync(TestFabric):
         """
         @self._context.decorator
         def wrapper(connection):
-            if self._context.iscoroutine(query):
+            if self._context.iscoroutine(query):  # pragma: no cover
                 return (yield from query(connection))
             return query(connection)
         return wrapper
@@ -346,13 +347,14 @@ class TestException(TestCase):
     """
     test user exceptions
     """
-    class TestError(exception.UserError):
+    class TestError(exceptions.UserError):
         pass
 
     def test_handle_error(self):
         """test handle_error method"""
 
-        self.assertRaisesRegex(self.TestError, "(1, 'this is test error')", exception.handle_error, self, exception.UserError(1, "TestError; this is test error"))
-        self.assertRaisesRegex(exception.UserError, "(1, 'Test2Error; this is test error')", exception.handle_error, self, exception.UserError(1, "Test2Error; this is test error"))
-        self.assertRaisesRegex(exception.UserError, "(1, 'this is test error')", exception.handle_error, self, exception.UserError(1, "this is test error"))
-        self.assertRaisesRegex(ValueError, "this is test error", exception.handle_error, self, ValueError("this is test error"))
+        self.assertRaisesRegex(self.TestError, "(1, 'this is test error')", exceptions.handle_error, self, exceptions.UserError(1, "TestError; this is test error"))
+        self.assertRaisesRegex(exceptions.UserError, "(1, 'Test2Error; this is test error')", exceptions.handle_error, self, exceptions.UserError(1, "Test2Error; this is test error"))
+        self.assertRaisesRegex(
+            exceptions.UserError, "(1, 'this is test error')", exceptions.handle_error, self, exceptions.UserError(1, "this is test error"))
+        self.assertRaisesRegex(ValueError, "this is test error", exceptions.handle_error, self, ValueError("this is test error"))

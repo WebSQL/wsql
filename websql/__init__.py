@@ -16,6 +16,7 @@ websql.converters module.
 """
 
 from .connections import *
+from .exceptions import *
 from .times import *
 from ._types import *
 
