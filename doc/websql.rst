@@ -6,7 +6,7 @@ Subpackages
 
 .. toctree::
 
-    websql.fabric
+    websql.cluster
 
 Submodules
 ----------
@@ -16,6 +16,7 @@ Submodules
    websql.connections
    websql.converters
    websql.cursors
+   websql.exceptions
    websql.times
 
 Module contents

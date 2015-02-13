@@ -1,5 +1,5 @@
 """
-WebSQL Connection Fabrics
+WebSQL Connection Cluster
 -------------------------
 
 This module implements pool of connections and connection providers

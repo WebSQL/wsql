@@ -1,8 +1,8 @@
 """
-WebSQL User Exceptions Handler
+WebSQL Exceptions
 --------------------
 
-This module implements user exceptions.
+This module describes all websql exceptions
 """
 
 import _websql
@@ -35,6 +35,12 @@ class UserError(ProgrammingError):
 
 
 def handle_error(exceptions, error, sep=';'):
+    """
+        handle exceptions from SQL procedures according to format <classname><sep><message>
+        :param exceptions: the module with all user defined exceptions
+        :param error: sql error
+        :param sep: (optional), the class, message separator
+    """
     if isinstance(error, Error):
         try:
             cls, _, msg = error.message.partition(sep)

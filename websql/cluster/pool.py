@@ -36,8 +36,8 @@ class _ConnectionPoolBase:
     def __init__(self, upstream, queue, timeout=None):
         """
         Constructor
-        :param upstream: factory to create a new connection
-        :type upstream: websql.fabric.Upstream
+        :param upstream: the cluster upstream
+        :type upstream: websql.cluster.Upstream
         :param queue: the queue to store connections
         :type queue: Queue
         :param timeout: the timeout in seconds to acquire new connection

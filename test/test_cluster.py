@@ -31,7 +31,7 @@ class TestServerInfo(TestCase):
         self.assertEqual('/var/tmp/socket.sock', str(srv_info))
 
 
-class TestFabric(DatabaseTestCase):
+class TestCluster(DatabaseTestCase):
     def make_upstream(self, servers):
         """abstract method to create a upstream"""
         return Upstream(servers, DummyLogger, loop=self._context.loop, **self._context.connect_kwargs)
@@ -256,7 +256,7 @@ class TestFabric(DatabaseTestCase):
         connection.execute(self.wrap_query(lambda x: None))
 
 
-class TestFabricSync(TestFabric):
+class TestClusterSync(TestCluster):
     @classmethod
     def get_context(cls):
         return WebSQLContextBase(WebSQLSetup())
@@ -295,7 +295,7 @@ class TestFabricSync(TestFabric):
         return query
 
 
-class TestFabricAsync(TestFabric):
+class TestClusterAsync(TestCluster):
     @classmethod
     def get_context(cls):
         return WebSQLContextBase(WebSQLSetupAsync())
@@ -340,7 +340,7 @@ class TestFabricAsync(TestFabric):
         query.call_count = 0
         return query
 
-del TestFabric
+del TestCluster
 
 
 class TestException(TestCase):
