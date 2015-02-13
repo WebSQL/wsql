@@ -219,7 +219,7 @@ setup(
     description='Asynchronous Python interface to MySQL',
     cmdclass=cmdclass,
     ext_modules=[module1],
-    packages=["websql", "websql.fabric"],
+    packages=["websql", "websql.cluster"],
     author="@bg",
     author_email='gaifullinbf@gmail.com',
     maintainer='@bg',
