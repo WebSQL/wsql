@@ -31,9 +31,12 @@ MySQL-5.5 and newer and Python-3.4 and newer are currently supported.
 
 WebSQL is `Free Software`_.
 
+`Documentation`_.
+
 .. _`MySQL`: http://www.mysql.com/
 .. _`Free Software`: http://www.gnu.org/
 .. _`WebScaleSQL`: http://webscalesql.org/
 .. _`[PEP-0249]`: http://www.python.org/peps/pep-0249.html
 .. _`Percona-XtraDB-Cluster`: http://www.percona.com/software/percona-xtradb-cluster
 .. _`GaleraCluster`: http://galeracluster.com/products/
+.. _`Documentation`: http://websql-websql.rhcloud.com/
