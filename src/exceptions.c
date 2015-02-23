@@ -59,6 +59,7 @@ _mysql_set_exception(PyObject* cls, int code, const char* message)
         PyObject_SetAttrString(exc, "message", py_message);
         PyErr_SetObject(cls, exc);
     }
+    Py_XDECREF(exc);
     Py_XDECREF(py_code);
     Py_XDECREF(py_message);
     return NULL;
