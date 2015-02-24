@@ -228,7 +228,7 @@ setup(
     download_url="https://github.com/WebSQL/websql/archive/1.1.1.tar.gz",
     license='GPL',
     long_description=readme(),
-    keywords=["mysql", "cluster", "connector"],
+    keywords=["mysql-connector", "mysql-cluster", "asynio"],
     classifiers=[
         "Development Status :: 4 - Beta",
         "Environment :: Other Environment",
