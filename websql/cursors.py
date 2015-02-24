@@ -96,7 +96,7 @@ class CursorBase:
         :param obj: object to encode
         :return sql literal
         """
-        return get_codec(connection, obj, self.encoders[:-1])(connection, obj)
+        return get_codec(connection, obj, self.encoders)(connection, obj)
 
     @property
     def connection(self):
@@ -302,8 +302,8 @@ class Cursor(CursorBase):
             if isinstance(procname, str):
                 procname = procname.encode(connection.charset)
 
-            for index, arg in enumerate(args):
-                query = connection.format(b"SET @_%s_%d=%s", (procname, index, self._encode(connection, arg)))
+            if args:
+                query = b';'.join(((connection.format(b"SET @_%s_%d=%s", (procname, index, self._encode(connection, arg))) for index, arg in enumerate(args))))
                 self._query(connection, query)
                 self.nextset()
 
@@ -528,8 +528,8 @@ class AsyncCursor(CursorBase):
             if isinstance(procname, str):
                 procname = procname.encode(connection.charset)
 
-            for index, arg in enumerate(args):
-                query = connection.format(b"SET @_%s_%d=%s", (procname, index, self._encode(connection, arg)))
+            if args:
+                query = b';'.join(((connection.format(b"SET @_%s_%d=%s", (procname, index, self._encode(connection, arg))) for index, arg in enumerate(args))))
                 yield from self._query(connection, query)
                 yield from self.nextset()
 

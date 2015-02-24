@@ -259,15 +259,17 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
     def test_callproc(self):
         """test callproc method of cursor"""
         cursor = self._context.cursor()
-        procedure = self._create_procedure(('s varchar(255)',), 'select lower(s);')
-        r = cursor.callproc(procedure, ('FOO',))
-        self.assertEqual(1, len(r))
+        procedure = self._create_procedure(('s varchar(255)', 's1 varchar(255)',), 'select lower(s), upper(s1);')
+        r = cursor.callproc(procedure, ('FOO', 'foo'))
+        self.assertEqual(2, len(r))
         self.assertEqual('FOO', r[0])
+        self.assertEqual('foo', r[1])
         r = cursor.fetchall()
         self.assertIsNone(cursor.nextset())
         self.assertEqual(1, len(r), 'callproc produced no result set')
-        self.assertEqual(1, len(r[0]), 'callproc produced invalid result set')
+        self.assertEqual(2, len(r[0]), 'callproc produced invalid result set')
         self.assertEqual('foo', r[0][0], 'callproc produced invalid results')
+        self.assertEqual('FOO', r[0][1], 'callproc produced invalid results')
 
     def test_close(self):
         """test close method of connection"""
