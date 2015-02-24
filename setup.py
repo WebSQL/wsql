@@ -225,10 +225,12 @@ setup(
     maintainer='@bg',
     maintainer_email='gaifullinbf@gmail.com',
     url='https://github.com/WebSQL/websql',
+    download_url="https://github.com/WebSQL/websql/archive/1.1.1.tar.gz",
     license='GPL',
     long_description=readme(),
+    keywords=["mysql", "cluster", "connector"],
     classifiers=[
-        "Development Status :: 5 - Beta",
+        "Development Status :: 4 - Beta",
         "Environment :: Other Environment",
         "License :: OSI Approved :: GNU General Public License (GPL)",
         "Operating System :: MacOS :: MacOS X",
@@ -237,7 +239,7 @@ setup(
         "Operating System :: POSIX :: Linux",
         "Operating System :: Unix",
         "Programming Language :: C",
-        "Programming Language :: Python3",
+        "Programming Language :: Python :: 3.4",
         "Topic :: Database",
         "Topic :: Database :: Database Engines/Servers",
     ]
