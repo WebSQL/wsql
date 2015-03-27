@@ -158,7 +158,7 @@ class TestCursorBase(DatabaseTestCase):
         """test warning_check method of cursor"""
         cursor = self._context.wrap(self._context.connection().cursor())
         try:
-            self.__check_warning('Unknown table', cursor.execute, 'drop table if exists %s' % self._unique_name('table'))
+            self.__check_warning('Unknown table', cursor.execute, 'drop table if exists %s' % self.unique_name('table'))
         finally:
             cursor.close()
 

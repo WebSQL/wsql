@@ -57,6 +57,12 @@ class Connection:
         self._connection = connection
         self._meta = meta
 
+    def __getattr__(self, item):
+        """
+        compatibility with native connection
+        """
+        return getattr(self._connection, item)
+
     @property
     def _loop(self):
         """to support retryable operations"""
@@ -67,13 +73,6 @@ class Connection:
         :return: the native connection
         """
         return self._connection
-
-    @property
-    def connected(self):
-        """
-        an alias for connection.invalid
-        """
-        return self._connection.connected
 
     @property
     def meta(self):
@@ -90,20 +89,6 @@ class Connection:
         :return the result of query
         """
         return query(self)
-
-    def cursor(self):
-        """
-        an alias for connection.cursor()
-        """
-        return self._connection.cursor()
-
-    def commit(self):
-        """an alias for connection.commit()"""
-        return self._connection.commit()
-
-    def rollback(self):
-        """an alias for connection.rollback()"""
-        return self._connection.rollback()
 
 
 class _UpstreamBase:

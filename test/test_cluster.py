@@ -15,6 +15,7 @@ from unittest import TestCase
 from websql import exceptions
 from websql.cluster import ConnectionPool, Upstream, transaction, retryable, Cluster, connect
 from websql.cluster.upstream import ServerInfo, Connection
+from websql.cluster import _parser
 
 
 class DummyLogger:
@@ -231,8 +232,8 @@ class TestCluster(DatabaseTestCase):
         cluster = Cluster(master=None, slave=read_connection)
         self.assertRaisesRegex(Exception, "the operation is not permitted on read-only cluster", cluster.execute, write_query)
 
-    def test_smart_connect(self):
-        """test construct smart connect"""
+    def test_connect(self):
+        """test connect to the cluster"""
         connection_args = {"master": "localhost:3306#2,localhost#4", "slave": "localhost:3306#2", "database": "test"}
         connection = connect(connection_args, loop=self._context.loop)
         self.assertIsInstance(connection, Cluster)
@@ -358,3 +359,20 @@ class TestException(TestCase):
         self.assertRaisesRegex(
             exceptions.UserError, "(1, 'this is test error')", exceptions.handle_error, self, exceptions.UserError(1, "this is test error"))
         self.assertRaisesRegex(ValueError, "this is test error", exceptions.handle_error, self, ValueError("this is test error"))
+
+
+class TestParsers(TestCase):
+    def test_connection_parser(self):
+        """test parser of connection string"""
+        args = _parser.parse_connection_string("database=test;master=localhost:3306#2,localhost#4")
+        self.assertEqual({"database": "test", "master": "localhost:3306#2,localhost#4"}, args)
+
+        args2 = _parser.parse_connection_string(args)
+        self.assertIs(args, args2)
+
+        self.assertRaises(ValueError, _parser.parse_connection_string, ["database=test;master=localhost:3306#2,localhost#4"])
+
+    def test_uri_parser(self):
+        """test parse uri"""
+        result = _parser.uri_parser(lambda x: list(x))("dbcs://localhost:3306#2,127.0.0.1#4")
+        self.assertEqual([{"scheme": "dbcs", "host": "localhost", "port": '3306', "count": '2'}, {"scheme": None, "port": None, "host": "127.0.0.1", "count": '4'}], result)

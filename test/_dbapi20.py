@@ -149,7 +149,7 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
         self.cursors.append(cur1)
         cur2 = connection.cursor()
         self.cursors.append(cur2)
-        table = self._unique_name('table')
+        table = self.unique_name('table')
         self.tables.append(table)
         self._context.wait(cur1.execute('create table %s (name varchar(20))' % table))
         self._context.wait(cur1.execute("insert into %s values ('Victoria Bitter')" % table))

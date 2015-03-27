@@ -46,7 +46,7 @@ class DatabaseTestCase(TestCase):
         connection.commit()
         self._context.tear_down()
 
-    def _unique_name(self, kind):
+    def unique_name(self, kind):
         """
         :param kind: table|procedure
         :type kind: str
@@ -64,7 +64,7 @@ class DatabaseTestCase(TestCase):
         connection = self._context.connection()
         cursor = self._context.cursor()
 
-        table = self._unique_name('table')
+        table = self.unique_name('table')
         if self._context.debug:  # pragma: no cover
             print('table name %s' % table)
         self.tables.append(table)
@@ -88,7 +88,7 @@ class DatabaseTestCase(TestCase):
         connection = self._context.connection()
         cursor = self._context.cursor()
 
-        procedure = self._unique_name('proc')
+        procedure = self.unique_name('proc')
         self.procedures.append(procedure)
 
         cursor.execute("""
