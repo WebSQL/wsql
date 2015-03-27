@@ -9,11 +9,11 @@ WebSQL
 
 WebSQL is an asynchronous python connector to the popular `MySQL`_ database server based on `WebScaleSQL`_.
 The design goals are:
-- Compatibility with Python3 asyncio package
-- Compliance with Python database API version 2.0 `[PEP-0249]`_
-- Thread-safety
-- Thread-friendliness (threads will not block each other)
-- Support mysql-clusters like: `Percona-XtraDB-Cluster`_, `GaleraCluster`_
+ - Compatibility with Python3 asyncio package
+ - Compliance with Python database API version 2.0 `[PEP-0249]`_
+ - Thread-safety
+ - Thread-friendliness (threads will not block each other)
+ - Support mysql-clusters like: `Percona-XtraDB-Cluster`_, `GaleraCluster`_
     
 
 .. code:: python
