@@ -1,7 +1,7 @@
-websql.fabric.upstream module
+websql.cluster.upstream module
 =============================
 
-.. automodule:: websql.fabric.upstream
+.. automodule:: websql.cluster.upstream
     :members:
     :undoc-members:
     :show-inheritance:

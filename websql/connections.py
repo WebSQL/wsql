@@ -222,7 +222,8 @@ class Connection(ConnectionBase):
         if self._server_version < (4, 1):
             return tuple()
         self._db.query(b"SHOW WARNINGS")
-        return tuple(self._db.get_result(False))
+        result = self._db.get_result(False)
+        return tuple(result) if result else tuple()
 
     def ping(self, reconnect=False):
         """
@@ -285,6 +286,13 @@ class AsyncConnection(ConnectionBase):
         """
         return self.promise(self._db.run_async)
 
+    def select_db(self, db):
+        """
+        select database asynchronously
+        :return: the promise
+        """
+        return self.promise(self._db.select_db_async, db)
+
     def query(self, query):
         """
         :param query: string query
@@ -335,7 +343,7 @@ class AsyncConnection(ConnectionBase):
         yield from self.query(b"SHOW WARNINGS")
         result = self.get_result(False)
         warnings = list()
-        while True:
+        while result is not None:
             row = yield from self.promise(result.fetch_row_async)
             if row is None:
                 break

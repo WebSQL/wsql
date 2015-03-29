@@ -9,6 +9,7 @@ Submodules
    websql.cluster.functional
    websql.cluster.pool
    websql.cluster.upstream
+   websql.cluster.deploy
 
 Module contents
 ---------------

@@ -1,7 +1,7 @@
-websql.cluster.functional module
+websql.cluster.deploy module
 ===============================
 
-.. automodule:: websql.cluster.functional
+.. automodule:: websql.cluster.deploy
     :members:
     :undoc-members:
     :show-inheritance:

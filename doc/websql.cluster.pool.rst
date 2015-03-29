@@ -1,7 +1,7 @@
-websql.fabric.pool module
+websql.cluster.pool module
 =========================
 
-.. automodule:: websql.fabric.pool
+.. automodule:: websql.cluster.pool
     :members:
     :undoc-members:
     :show-inheritance:

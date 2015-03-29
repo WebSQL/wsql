@@ -1113,11 +1113,12 @@ _mysql_connection_object_select_db_async(
     PyObject *args)
 {
     char *db;
-    my_bool error;
+    int error;
     net_async_status status;
     if (!PyArg_ParseTuple(args, "s:select_db", &db))
         return NULL;
     CHECK_CONNECTION(self, NULL);
+    TRACE1("%p", self);
     status = mysql_select_db_nonblocking(&(self->connection), db, &error);
     if (status == NET_ASYNC_COMPLETE && error) {
         TRACE2("%p, %d", self, error);
@@ -1298,6 +1299,7 @@ static PyMethodDef _mysql_connection_object_methods[] = {
     {
         "query_async",
         (PyCFunction)_mysql_connection_object_query_async,
+        METH_VARARGS,
         METH_VARARGS,
         _mysql_connection_object_query_async__doc__
     },

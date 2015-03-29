@@ -11,7 +11,7 @@ except ImportError:  # pragma: no cover
     from ._case import DatabaseTestCase
     from ._websql_context import WebSQLSetup, WebSQLContextBase
 
-from websql.cluster import scheme
+from websql.cluster import deploy
 import warnings
 
 
@@ -36,7 +36,7 @@ class TestDeployScheme(DatabaseTestCase):
                       b"DELIMITER ;",
                       b"SET A=1;SET B=2;"]
 
-        statements = list(scheme._statement_iter(statements))
+        statements = list(deploy._statement_iter(statements))
         self.assertEqual(b"CREATE TABLE IF NOT EXISTS `test` (\n"
                          b"`id` BIGINT NOT NULL AUTO_INCREMENT,\n"
                          b"PRIMARY KEY (`id`)\n"
@@ -51,7 +51,7 @@ class TestDeployScheme(DatabaseTestCase):
         self.assertEqual(b"SET A=1", statements[3])
         self.assertEqual(b"SET B=2", statements[4])
 
-    def test_deploy_scheme_single(self):
+    def test_deploy_scheme_to_master(self):
         table = self.unique_name("table").encode("utf8")
         procedure = self.unique_name("procedure").encode("utf8")
         statements = [b"CREATE TABLE IF NOT EXISTS `" + table + b"` (",
@@ -70,7 +70,7 @@ class TestDeployScheme(DatabaseTestCase):
         connection_args.update(self._context.connect_kwargs)
         warnings.filterwarnings('default')
         with warnings.catch_warnings(record=True):
-            scheme.deploy_scheme(connection_args, statements, for_all=False, parallel=False)
+            deploy.apply_statements(connection_args, statements, for_all=False)
 
         cursor = self._context.cursor()
         cursor.callproc(procedure)
@@ -80,13 +80,14 @@ class TestDeployScheme(DatabaseTestCase):
         self.tables.append(table.decode("utf8"))
         self.procedures.append(procedure.decode("utf8"))
 
-    def test_deploy_scheme_multi(self):
+    def test_deploy_scheme_to_all(self):
         table = self.unique_name("table").encode("utf8")
         procedure = self.unique_name("procedure").encode("utf8")
         statements = [b"CREATE TABLE IF NOT EXISTS `" + table + b"` (",
                       b"`id` BIGINT NOT NULL AUTO_INCREMENT,",
                       b"PRIMARY KEY (`id`)",
                       b");",
+                      b'SHOW TABLES;'
                       b"DROP PROCEDURE IF EXISTS `" + procedure + b"`;",
                       b"DELIMITER $$",
                       b"CREATE PROCEDURE `" + procedure + b"` ()",
@@ -99,7 +100,7 @@ class TestDeployScheme(DatabaseTestCase):
         connection_args.update(self._context.connect_kwargs)
         warnings.filterwarnings('default')
         with warnings.catch_warnings(record=True):
-            scheme.deploy_scheme(connection_args, statements, for_all=True, parallel=True)
+            deploy.apply_statements(connection_args, statements, for_all=True)
 
         cursor = self._context.cursor()
         cursor.callproc(procedure)
