@@ -4,17 +4,22 @@
 __author__ = "Bulat Gaifullin (bulat.gaifullin@acronis.com)"
 
 
-def parse_connection_string(connection_string):
+def parse_connection_string(connection_args, kwargs=None):
     """
     parse the connection string
-    :param connection_string: the connection string, pairs of key=value  delimited by ;
+    :param connection_args: the connection string, pairs of key=value  delimited by ;
     :return: the key,value pairs from connection string
     """
-    if isinstance(connection_string, str):
-        return dict(x.split("=") for x in connection_string.split(";") if x)
-    elif isinstance(connection_string, dict):
-        return connection_string
-    raise ValueError("unsupported format of connection string: %s", type(connection_string))
+    if isinstance(connection_args, str):
+        connection_args = dict(x.split("=") for x in connection_args.split(";") if x)
+    elif isinstance(connection_args, dict):
+        connection_args = connection_args.copy()
+    else:
+        raise ValueError("unsupported format of connection string: %s", type(connection_args))
+
+    if kwargs:
+        connection_args.update(kwargs)
+    return connection_args
 
 
 def uri_parser(callback):

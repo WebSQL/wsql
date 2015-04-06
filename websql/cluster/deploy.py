@@ -33,24 +33,6 @@ def _statement_iter(stream):
                     break
 
 
-def get_connection(loop=None, database=None, **kwargs):
-    class Holder:
-        connection = None
-        cursor = None
-
-    connection = connect(**kwargs)
-    cursor = connection.cursor()
-    database_bin = database.encode(connection.charset)
-    cursor.execute(b"CREATE SCHEMA IF NOT EXISTS `" + database_bin + b"` DEFAULT CHARSET utf8 COLLATE utf8_unicode_ci;")
-    cursor.execute(b"ALTER DATABASE `" + database_bin + b"` DEFAULT CHARACTER SET utf8 COLLATE utf8_unicode_ci;")
-    connection.select_db(database)
-
-    holder = Holder()
-    holder.connection = connection
-    holder.cursor = cursor
-    return holder
-
-
 def __update_kwargs(kwargs, host, port):
     kw = kwargs.copy()
     if host:
@@ -60,9 +42,9 @@ def __update_kwargs(kwargs, host, port):
     return kw
 
 
-def __apply_to_master(connection_args, statements):
+def __deploy_to_master(connection_args, statements, scheme_options):
     """
-    apply statement for one node
+    deploy scheme to master node
     :param connection_args: the connection arguments
     :param statements: the statements to apply
     """
@@ -72,15 +54,33 @@ def __apply_to_master(connection_args, statements):
 
     with connection:
         with connection.cursor() as cursor:
-            cursor.execute(b"CREATE SCHEMA IF NOT EXISTS `" + database_bin + b"` DEFAULT CHARSET utf8 COLLATE utf8_unicode_ci;")
-            cursor.execute(b"ALTER DATABASE `" + database_bin + b"` DEFAULT CHARACTER SET utf8 COLLATE utf8_unicode_ci;")
+            cursor.execute(b"CREATE SCHEMA IF NOT EXISTS `" + database_bin + b"`" + scheme_options + b";")
+            cursor.execute(b"ALTER DATABASE `" + database_bin + b"`" + scheme_options + b";")
             connection.select_db(database)
 
             for statement in statements:
-                cursor.execute(statement)
+                try:
+                    cursor.execute(statement)
+                except:
+                    import sys
+                    print(statement, file=sys.stderr)
+                    raise
 
 
-def __apply_to_all(servers, connection_args, statements):
+def __drop_from_master(connection_args):
+    """
+    drop scheme from master node
+    """
+    database = connection_args.pop('database')
+    connection = connect(**connection_args)
+    database_bin = database.encode('ascii')
+
+    with connection:
+        with connection.cursor() as cursor:
+            cursor.execute(b"DROP SCHEMA IF EXISTS `" + database_bin + b"`;")
+
+
+def __deploy_to_all(servers, connection_args, statements, scheme_options):
     """
     apply for all servers asynchronously
     :param servers: the servers in cluster
@@ -100,16 +100,20 @@ def __apply_to_all(servers, connection_args, statements):
         try:
             cursor = connection.cursor()
             try:
-                yield from cursor.execute(b"CREATE SCHEMA IF NOT EXISTS `" + database_bin + b"` DEFAULT CHARSET utf8 COLLATE utf8_unicode_ci;")
-                yield from cursor.execute(b"ALTER DATABASE `" + database_bin + b"` DEFAULT CHARACTER SET utf8 COLLATE utf8_unicode_ci;")
-                yield from cursor.nextset()
+                yield from cursor.execute(b"CREATE SCHEMA IF NOT EXISTS `" + database_bin + b"`" + scheme_options + b";")
+                yield from cursor.execute(b"ALTER DATABASE `" + database_bin + b"`" + scheme_options + b";")
                 yield from connection.select_db(database)
 
                 while True:
                     s = yield from queue.get()
                     if s is None:
                         break
-                    yield from cursor.execute(s)
+                    try:
+                        yield from cursor.execute(s)
+                    except:
+                        import sys
+                        print(s, file=sys.stderr)
+                        raise
             finally:
                 yield from cursor.close()
             yield from connection.commit()
@@ -143,14 +147,51 @@ def __apply_to_all(servers, connection_args, statements):
         loop.close()
 
 
-def apply_statements(connection_args, source, for_all=False):
+def __drop_from_all(servers, connection_args):
     """
+    drop from all nodes
+    :param servers: the servers in cluster
+    :param connection_args: the connection arguments
+    """
+    import asyncio
+
+    loop = asyncio.new_event_loop()
+    database = connection_args.pop('database')
+    database_bin = database.encode('ascii')
+
+    @asyncio.coroutine
+    def apply(host, port):
+        connection = yield from connect(loop=loop, **__update_kwargs(connection_args, host, port))
+        try:
+            cursor = connection.cursor()
+            try:
+                yield from cursor.execute(b"DROP SCHEMA IF EXISTS `" + database_bin + b"`;")
+            finally:
+                yield from cursor.close()
+        finally:
+            connection.close()
+
+    try:
+        tasks = []
+        for server in servers:
+            tasks.append(asyncio.async(apply(server[0], server[1]), loop=loop))
+
+        loop.run_until_complete(asyncio.wait(tasks, loop=loop))
+        tasks.clear()
+    finally:
+        loop.close()
+
+
+def deploy_scheme(connection_args, source, for_all=False, scheme_options=b'', **kwargs):
+    """
+    deploy scheme to cluster
     :param connection_args: the connection arguments, included all nodes and database name
     :param source: the source file(should be open in binary mode)
     :param for_all: apply the statement for all nodes in cluster
+    :param kwargs: additional connection arguments
     """
 
-    connection_args = parse_connection_string(connection_args)
+    connection_args = parse_connection_string(connection_args, kwargs)
 
     masters = set()
     slaves = set()
@@ -163,7 +204,34 @@ def apply_statements(connection_args, source, for_all=False):
     uri_parser(lambda x: add_server(slaves, x))(connection_args.pop('slave', None))
 
     if for_all:
-        __apply_to_all(masters | slaves, connection_args, _statement_iter(source))
+        __deploy_to_all(masters | slaves, connection_args, _statement_iter(source), scheme_options)
     else:
         master = next(iter(masters))
-        __apply_to_master(__update_kwargs(connection_args, master[0], master[1]), _statement_iter(source))
+        __deploy_to_master(__update_kwargs(connection_args, master[0], master[1]), _statement_iter(source), scheme_options)
+
+
+def drop_scheme(connection_args, for_all=False, **kwargs):
+    """
+    drop the scheme from cluster
+    :param connection_args: the
+    :param for_all:
+    :param kwargs: additional connection arguments
+    :return:
+    """
+    connection_args = parse_connection_string(connection_args, kwargs)
+
+    masters = set()
+    slaves = set()
+
+    def add_server(target, servers):
+        for server in servers:
+            target.add((server.get('host'), int(server.get('port', 0) or 0)))
+
+    uri_parser(lambda x: add_server(masters, x))(connection_args.pop('master', None))
+    uri_parser(lambda x: add_server(slaves, x))(connection_args.pop('slave', None))
+
+    if for_all:
+        __drop_from_all(masters | slaves, connection_args)
+    else:
+        master = next(iter(masters))
+        __drop_from_master(__update_kwargs(connection_args, master[0], master[1]))

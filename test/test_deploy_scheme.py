@@ -70,7 +70,8 @@ class TestDeployScheme(DatabaseTestCase):
         connection_args.update(self._context.connect_kwargs)
         warnings.filterwarnings('default')
         with warnings.catch_warnings(record=True):
-            deploy.apply_statements(connection_args, statements, for_all=False)
+            deploy.drop_scheme(connection_args, for_all=False)
+            deploy.deploy_scheme(connection_args, statements, for_all=False, scheme_options=b"DEFAULT CHARACTER SET utf8 COLLATE utf8_unicode_ci")
 
         cursor = self._context.cursor()
         cursor.callproc(procedure)
@@ -100,7 +101,8 @@ class TestDeployScheme(DatabaseTestCase):
         connection_args.update(self._context.connect_kwargs)
         warnings.filterwarnings('default')
         with warnings.catch_warnings(record=True):
-            deploy.apply_statements(connection_args, statements, for_all=True)
+            deploy.drop_scheme(connection_args, for_all=True)
+            deploy.deploy_scheme(connection_args, statements, for_all=True, scheme_options=b"DEFAULT CHARACTER SET utf8 COLLATE utf8_unicode_ci")
 
         cursor = self._context.cursor()
         cursor.callproc(procedure)

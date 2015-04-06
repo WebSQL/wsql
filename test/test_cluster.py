@@ -368,7 +368,7 @@ class TestParsers(TestCase):
         self.assertEqual({"database": "test", "master": "localhost:3306#2,localhost#4"}, args)
 
         args2 = _parser.parse_connection_string(args)
-        self.assertIs(args, args2)
+        self.assertEqual(args, args2)
 
         self.assertRaises(ValueError, _parser.parse_connection_string, ["database=test;master=localhost:3306#2,localhost#4"])
 
