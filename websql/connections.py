@@ -78,6 +78,10 @@ def connect(*args, loop=UNSET, **kwargs):
     :param local_infile: integer, non-zero enables LOAD LOCAL INFILE; zero disables
     :type local_infile: bool
     :param loop: the event-loop, if specified the asynchronous connection will be created
+    :param defer_warnings: if True, the warnings will be ignored
+    :type defer_warnings: bool
+    :param use_result: store results on server or use buffered results
+    type   use_result: bool
     :return: new coroutine in nonblocking mode and connection otherwise
     """
 
@@ -120,6 +124,8 @@ class ConnectionBase(object):
                  encoders=None,
                  decoders=None,
                  row_formatter=None,
+                 defer_warnings=None,
+                 use_result=None,
                  client_flag=None, **kwargs):
         """
         :param cursorclass: the cursor class
@@ -128,6 +134,7 @@ class ConnectionBase(object):
         :param decoders: the list of functions to convert from sql to python
         :param row_formatter: the function to format row
         :param client_flag: the flags of client, for details see connect
+        :param defer_warnings: if True, the warnings will be ignored
         :param kwargs: connection keyword arguments, for details see connect
         """
 
@@ -136,6 +143,8 @@ class ConnectionBase(object):
         self.decoders = default_decoders if decoders is None else decoders
         self.row_formatter = default_row_formatter if row_formatter is None else row_formatter
         self.format = _websql.format
+        self.defer_warnings = defer_warnings
+        self.use_result = use_result
 
         client_flag = client_flag or 0
         client_version = tuple((int(n) for n in _websql.get_client_info().split('.')[:2]))

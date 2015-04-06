@@ -51,6 +51,12 @@ class CursorBase:
         self._info = None
         self._row_decoders = ()
 
+        # override from connection
+        if connection.use_result is not None:
+            self._use_result = connection.use_result
+        if connection.defer_warnings is not None:
+            self._defer_warnings = connection.defer_warnings
+
     def __del__(self):
         if self._result is not None:
             warn(ResourceWarning("unclosed %r" % self))
@@ -303,8 +309,8 @@ class Cursor(CursorBase):
                 procname = procname.encode(connection.charset)
 
             if args:
-                query = b';'.join(((connection.format(b"SET @_%s_%d=%s", (procname, index, self._encode(connection, arg))) for index, arg in enumerate(args))))
-                self._query(connection, query)
+                for statement in (connection.format(b"SET @_%s_%d=%s", (procname, index, self._encode(connection, arg))) for index, arg in enumerate(args)):
+                    self._query(connection, statement)
                 self.nextset()
 
             query = connection.format(b"CALL %s(%s)",
@@ -529,8 +535,8 @@ class AsyncCursor(CursorBase):
                 procname = procname.encode(connection.charset)
 
             if args:
-                query = b';'.join(((connection.format(b"SET @_%s_%d=%s", (procname, index, self._encode(connection, arg))) for index, arg in enumerate(args))))
-                yield from self._query(connection, query)
+                for statement in (connection.format(b"SET @_%s_%d=%s", (procname, index, self._encode(connection, arg))) for index, arg in enumerate(args)):
+                    yield from self._query(connection, statement)
                 yield from self.nextset()
 
             query = connection.format(b"CALL %s(%s)",
