@@ -28,7 +28,7 @@ def connect(connection_args, loop=UNSET, logger=None, **kwargs):
 
     connection_args = parse_connection_string(connection_args, kwargs)
     retries = int(connection_args.pop('retries', 5))
-    delay = int(connection_args.pop('delay', 0.2))
+    delay = float(connection_args.pop('delay', 0.2))
     timeout = int(connection_args.pop('timeout', 1))
 
     make_connection = uri_parser(lambda servers: retryable(ConnectionPool(Upstream(servers, connect_timeout=timeout, loop=loop, logger=logger, **connection_args),
