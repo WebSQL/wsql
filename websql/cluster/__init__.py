@@ -30,13 +30,15 @@ def connect(connection_args, loop=UNSET, logger=None, **kwargs):
     retries = int(connection_args.pop('retries', 5))
     delay = float(connection_args.pop('delay', 0.2))
     timeout = int(connection_args.pop('timeout', 1))
+    master = connection_args.pop("master", "")
+    slave = connection_args.pop("slave", "")
 
     make_connection = uri_parser(lambda servers: retryable(ConnectionPool(Upstream(servers, connect_timeout=timeout, loop=loop, logger=logger, **connection_args),
                                                                           timeout=timeout, loop=loop),
                                                            count=retries, delay=delay))
 
-    master = make_connection(connection_args.pop("master", ""))
-    slave = make_connection(connection_args.pop("slave", ""))
+    master = make_connection(master)
+    slave = make_connection(slave)
 
     if slave:
         return Cluster(master=master, slave=slave)

@@ -182,7 +182,7 @@ class BuildExt(_build_ext):
                 self.libraries.append(basename[start:end])
 
 __name__ = "websql"
-__version__ = "1.1.4"
+__version__ = "1.1.5"
 
 extra_link_args = ["-lstdc++"]
 
@@ -228,7 +228,7 @@ setup(
     download_url="https://github.com/WebSQL/websql/archive/1.1.1.tar.gz",
     license='GPL',
     long_description=readme(),
-    keywords=["mysql-connector", "mysql-cluster", "asynio"],
+    keywords=["mysql-connector", "mysql-cluster", "asyncio"],
     classifiers=[
         "Development Status :: 4 - Beta",
         "Environment :: Other Environment",
