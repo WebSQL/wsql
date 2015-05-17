@@ -15,10 +15,15 @@ def _statement_iter(stream):
     def not_comment(x):
         return not (x.startswith(b'--') or x.startswith(b'#'))
 
+    def norm(x):
+        if isinstance(x, str):
+            x = x.encode('utf-8')
+        return x.strip()
+
     sep = b';'
     statement = b''
 
-    for line in filter(not_comment, map(lambda x: x.strip(), stream)):
+    for line in filter(not_comment, map(norm, stream)):
         if line.startswith(delimiter):
             sep = line[len(delimiter) + 1:].strip()
             statement = b''
