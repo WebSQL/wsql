@@ -598,6 +598,20 @@ class DatabaseAPI20TestCases(DatabaseTestCase):
         self.assertEqual(len(self.SAMPLES), len(names))
         self.assertIsNone(cursor.nextset(), 'No more return sets, should return None')
 
+    def test_fetchxall(self):
+        """test fetchxall method of cursor"""
+        cursor = self._context.cursor()
+        self._context.rows = len(self.SAMPLES)
+        table = self._create_table(('name varchar(20)',), lambda x, y: y == 0 and self.SAMPLES[x])
+
+        procedure = self._create_procedure((), 'select count(*) from {0}; select name from {0};'.format(table))
+        cursor.callproc(procedure)
+        numberofrows = cursor.fetchxall()[0]
+        self.assertEqual(len(self.SAMPLES), numberofrows[0])
+        names = cursor.fetchxall()
+        self.assertEqual(len(self.SAMPLES), len(names))
+        self.assertIsNone(cursor.nextset(), 'No more return sets, should return None')
+
     def test_scroll(self):
         """test scroll method of cursor"""
         cursor = self._context.cursor()

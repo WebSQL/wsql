@@ -182,7 +182,7 @@ class BuildExt(_build_ext):
                 self.libraries.append(basename[start:end])
 
 __name__ = "websql"
-__version__ = "1.1.5"
+__version__ = "1.1.6"
 
 extra_link_args = ["-lstdc++"]
 

@@ -368,6 +368,15 @@ class Cursor(CursorBase):
         self._check_has_result()
         return [row for row in self]
 
+    def fetchxall(self):
+        """
+        Same as self.fetchall(), self.next()
+        Not standard
+        """
+        r = self.fetchall()
+        self.nextset()
+        return r
+
     def scroll(self, offset, mode='relative'):
         """
         Scroll the cursor in the result set to a new position according to mode.
@@ -603,6 +612,16 @@ class AsyncCursor(CursorBase):
             append(row)
         return rows
 
+    @asyncio.coroutine
+    def fetchxall(self):
+        """
+        Same as self.nextset(), self.fetchall()
+        Not standard
+        """
+        r = (yield from self.fetchall())
+        yield from self.nextset()
+        return r
+
     def scroll(self, offset, mode='relative'):
         """
         Scroll the cursor in the result set to a new position according to mode.
@@ -612,3 +631,4 @@ class AsyncCursor(CursorBase):
         Not supported yet
         """
         raise self.NotSupportedError
+

@@ -55,12 +55,6 @@ def connect(*args, loop=UNSET, **kwargs):
     :type read_default_file: str
     :param read_default_group: configuration group to use from the default file
     :type read_default_group: str
-    :param use_unicode: If True, text-like columns are returned as unicode objects
-                        using the connection's character set.  Otherwise, text-like
-                        columns are returned as strings.  columns are returned as
-                        normal strings. Unicode objects will always be encoded to
-                        the connection's character set regardless of this setting.
-    :type use_unicode: bool
     :param charset:     If supplied, the connection character set will be changed
                         to this character set (MySQL-4.1 and newer). This implies use_unicode=True.
     :type charset: str
