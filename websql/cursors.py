@@ -308,14 +308,16 @@ class Cursor(CursorBase):
             if isinstance(procname, str):
                 procname = procname.encode(connection.charset)
 
+            procname = procname.strip(b'`')
+
             if args:
-                for statement in (connection.format(b"SET @_%s_%d=%s", (procname, index, self._encode(connection, arg))) for index, arg in enumerate(args)):
+                for statement in (connection.format(b"SET @`_%s_%d`=%s", (procname, index, self._encode(connection, arg))) for index, arg in enumerate(args)):
                     self._query(connection, statement)
                 self.nextset()
 
-            query = connection.format(b"CALL %s(%s)",
+            query = connection.format(b"CALL `%s`(%s)",
                                       (procname,
-                                       b','.join(connection.format(b'@_%s_%d', (procname, i)) for i in range(len(args)))))
+                                       b','.join(connection.format(b'@`_%s_%d`', (procname, i)) for i in range(len(args)))))
 
             self._query(connection, query)
 
@@ -543,14 +545,16 @@ class AsyncCursor(CursorBase):
             if isinstance(procname, str):
                 procname = procname.encode(connection.charset)
 
+            procname = procname.strip(b'`')
+
             if args:
-                for statement in (connection.format(b"SET @_%s_%d=%s", (procname, index, self._encode(connection, arg))) for index, arg in enumerate(args)):
+                for statement in (connection.format(b"SET @`_%s_%d`=%s", (procname, index, self._encode(connection, arg))) for index, arg in enumerate(args)):
                     yield from self._query(connection, statement)
                 yield from self.nextset()
 
-            query = connection.format(b"CALL %s(%s)",
+            query = connection.format(b"CALL `%s`(%s)",
                                       (procname,
-                                       b','.join(connection.format(b'@_%s_%d', (procname, i)) for i in range(len(args)))))
+                                       b','.join(connection.format(b'@`_%s_%d`', (procname, i)) for i in range(len(args)))))
 
             yield from self._query(connection, query)
             if not self._defer_warnings:
