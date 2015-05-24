@@ -4,6 +4,8 @@ __pycache__/
 /_wsql.so
 /.coverage
 /.idea
+/doc/_build
 /build
 /dist
 /MANIFEST
+/wsql.egg-info
