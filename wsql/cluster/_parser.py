@@ -44,8 +44,10 @@ def uri_parser(callback):
     uri_scheme = re.compile(r"(?:(?:(?:(?:(?P<scheme>dbcs?)://)?(?P<host>[\w\d\.]+)(?::(?P<port>\d+))?(?:#(?P<count>\d+))?),?)+?)")
 
     def parser(uri):
-        if isinstance(uri, list):
-            uri = ','.join(uri)
         if uri:
+            if isinstance(uri, list):
+                import itertools
+                iters = (uri_scheme.finditer(u) for u in uri)
+                return callback(x.groupdict() for x in itertools.chain(*iters))
             return callback(x.groupdict() for x in uri_scheme.finditer(uri))
     return parser
