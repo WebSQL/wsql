@@ -1,14 +1,21 @@
 """
-times module
-------------
+WSQL
+====
+An asynchronous DB API v2.0 compatible interface to MySQL
+---------------------------------------------------------
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-WARNING: The doctests only pass if you're in the right timezone and
-daylight savings time setting. XXX
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
-This module provides some help functions for dealing with MySQL data.
-Most of these you will not have to use directly.
-
-Uses Python datetime module to handle time-related columns."""
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
 
 from time import localtime
 from datetime import date, datetime, time, timedelta

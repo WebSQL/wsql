@@ -22,21 +22,21 @@ __author__ = "@bg"
 
 try:
     from _dbapi20 import DatabaseAPI20TestCases
-    from _websql_context import WebSQLContext, WebSQLAsyncContext
+    import _wsql_context
 except ImportError:  # pragma: no cover
     from ._dbapi20 import DatabaseAPI20TestCases
-    from ._wsql_context import WebSQLContext, WebSQLAsyncContext
+    from . import _wsql_context
 
 
 class TestWebSQLDBAPI20(DatabaseAPI20TestCases):
     @classmethod
     def get_context(cls):
-        return WebSQLContext()
+        return _wsql_context.Context(_wsql_context.Configuration())
 
 
 class TestWebSQLAsyncDBAPI20(DatabaseAPI20TestCases):
     @classmethod
     def get_context(cls):
-        return WebSQLAsyncContext()
+        return _wsql_context.Context(_wsql_context.ConfigurationAsync())
 
 del DatabaseAPI20TestCases

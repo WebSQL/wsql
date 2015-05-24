@@ -1,18 +1,21 @@
 """
-WebSQL
-=======
+WSQL
+====
 An asynchronous DB API v2.0 compatible interface to MySQL
 ---------------------------------------------------------
 
-This package is a wrapper around _websql, which mostly implements the MySQL C API.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-See the C API specification and the MySQL documentation for more info
-on other items.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
-For information on the DB API, see PEP-249.
-
-For information on how websql handles type conversion, see the
-websql.converters module.
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from .connections import *

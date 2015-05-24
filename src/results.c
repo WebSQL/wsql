@@ -1,15 +1,31 @@
-/* -*- mode: C; indent-tabs-mode: t; c-basic-offset: 8; -*- */
+/*
+WSQL
+====
+An asynchronous python interface to MySQL
+---------------------------------------------------------
 
-#include "mysqlmod.h"
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-static PyObject *
-_mysql_result_object_get_fields(
-    _mysql_result_object *self,
-    unsigned int num_fields)
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#include "result.h"
+#include "field.h"
+
+static PyObject* wsql_result_get_fields(wsql_result *self, unsigned int num_fields)
 {
     PyObject *args2 = NULL, *kwargs2 = NULL;
     PyObject *fields = NULL;
-    _mysql_field_object *field = NULL;
+    wsql_field *field = NULL;
     unsigned int i;
 
     CHECK_RESULT(self, NULL);
@@ -20,18 +36,22 @@ _mysql_result_object_get_fields(
     if (!(kwargs2 = PyDict_New()))
         goto on_error;
 
-    for (i=0; i<num_fields; ++i) {
+    for (i=0; i<num_fields; ++i)
+    {
         if (!(args2 = Py_BuildValue("(Oi)", self, i)))
             goto on_error;
 
-        if (!(field = Py_ALLOC(_mysql_field_object, _mysql_field_object_t)))
+        if (!(field = Py_ALLOC(wsql_field, wsql_field_t)))
             goto on_error;
 
-        if (_mysql_field_object__init__(field, args2, kwargs2))
+        if (wsql_field__init__(field, args2, kwargs2))
+        {
+            Py_DECREF(field);
             goto on_error;
+        }
 
         Py_DECREF(args2);
-        PyTuple_SET_ITEM(fields, i, (PyObject *) field);
+        PyTuple_SET_ITEM(fields, i, (PyObject *)field);
     }
     Py_DECREF(kwargs2);
     return fields;
@@ -43,24 +63,19 @@ _mysql_result_object_get_fields(
     return NULL;
 }
 
-static char _mysql_result_object__doc__[] =
+static const char wsql_result__doc__[] =
 "result(connection, use=0) -- Result set from a query.\n" \
-"\n" \
 "Creating instances of this class directly is an excellent way to\n" \
-"shoot yourself in the foot. If using _mysql.connection directly,\n" \
+"shoot yourself in the foot. If using wsql.connection directly,\n" \
 "use connection.store_result() or connection.use_result() instead.\n" \
-"If using MySQLdb.Connection, this is done by the cursor class.\n" \
+"If using wsql.Connection, this is done by the cursor class.\n" \
 "Just forget you ever saw this. Forget... FOR-GET...";
 
-int
-_mysql_result_object__init__(
-    _mysql_result_object *self,
-    PyObject *args,
-    PyObject *kwargs)
+int wsql_result__init__(wsql_result *self, PyObject *args, PyObject *kwargs)
 {
     static char *kwlist[] = {"connection", "use", NULL};
     MYSQL_RES *result;
-    _mysql_connection_object *connection = NULL;
+    wsql_connection *connection = NULL;
     int use = 0;
     unsigned int n;
 
@@ -79,26 +94,25 @@ _mysql_result_object__init__(
     self->connection = (PyObject *) connection;
     Py_INCREF(self->connection);
 
-    if (!result) {
+    if (!result)
+    {
         if (mysql_field_count(&(connection->connection)) == 0)
             return 0;
-        _mysql_exception(connection);
+
+        wsql_raise_error(connection);
         return -1;
     }
     n = mysql_num_fields(result);
     self->num_fields = n;
-    self->fields = _mysql_result_object_get_fields(self, n);
+    self->fields = wsql_result_get_fields(self, n);
     return 0;
 }
 
-static char _mysql_result_object_description__doc__[] =
+static char wsql_result_description__doc__[] =
 "the sequence of 7-tuples required by the DB-API for\n" \
 "the Cursor.description attribute.\n";
 
-static PyObject *
-_mysql_result_object_description(
-    _mysql_result_object *self,
-    void* closure)
+static PyObject* wsql_result_get_description(wsql_result *self, void* closure)
 {
     PyObject *result;
     MYSQL_FIELD *fields;
@@ -125,6 +139,7 @@ _mysql_result_object_description(
                                    (long) !(IS_NOT_NULL(fields[i].flags)));
         if (!field_desc)
             goto on_error;
+
         PyTuple_SET_ITEM(result, i, field_desc);
     }
     return result;
@@ -135,18 +150,16 @@ _mysql_result_object_description(
 }
 
 
-static PyObject*
-_mysql_convert_row(
-    _mysql_result_object *self,
-    MYSQL_ROW row)
+static PyObject* wsql_result_convert_row(wsql_result *self, MYSQL_ROW row)
 {
     PyObject *v, *result = NULL;
     unsigned int i, n;
     unsigned long *length;
 
-    if (!row) {
+    if (!row)
+    {
       if (mysql_errno(&(RESULT_CONNECTION(self)->connection)))
-        return _mysql_exception(RESULT_CONNECTION(self));
+        return wsql_raise_error(RESULT_CONNECTION(self));
 
       self->more_rows = 0;
       Py_RETURN_NONE;
@@ -158,12 +171,15 @@ _mysql_convert_row(
 
     length = mysql_fetch_lengths(self->result);
 
-    for (i=0; i<n; ++i) {
-        if (row[i]) {
+    for (i=0; i<n; ++i)
+    {
+        if (row[i])
+        {
             v = PyBytes_FromStringAndSize(row[i], length[i]);
-            if (!v)
-                goto on_error;
-        } else /* NULL */ {
+            if (!v) goto on_error;
+        }
+        else /* NULL */
+        {
             v = Py_None;
             Py_INCREF(v);
         }
@@ -176,36 +192,36 @@ _mysql_convert_row(
     return NULL;
 }
 
-static char _mysql_result_object_fetch_row__doc__[] =
+static const char wsql_result_fetch_row__doc__[] =
 "  Fetches one row as a tuple of strings.\n" \
 "  NULL is returned as None.\n" \
 "  A single None indicates the end of the result set.\n";
 
-static PyObject *
-_mysql_result_object_fetch_row(
-    _mysql_result_object *self)
- {
+static PyObject* wsql_result_fetch_row(wsql_result *self)
+{
     MYSQL_ROW row;
 
     CHECK_RESULT(self, NULL);
 
     if (!self->use)
+    {
         row = mysql_fetch_row(self->result);
-    else {
+    }
+    else
+    {
         Py_BEGIN_ALLOW_THREADS;
         row = mysql_fetch_row(self->result);
         Py_END_ALLOW_THREADS;
     }
-    return _mysql_convert_row(self, row);
+    return wsql_result_convert_row(self, row);
 }
 
-static int
-_mysql_result_object_clear(
-    _mysql_result_object *self)
+static int wsql_result_clear(wsql_result *self)
 {
     TRACE1("%p", self);
 
-    if (self->result) {
+    if (self->result)
+    {
         mysql_free_result(self->result);
         self->result = NULL;
     }
@@ -218,18 +234,17 @@ _mysql_result_object_clear(
     return 0;
 }
 
-static char _mysql_result_object_free__doc__[] =
+static const char wsql_result_free__doc__[] =
 "free internal structures, should be called after all results are fetched.";
 
-static PyObject *
-_mysql_result_object_free(
-    _mysql_result_object *self)
+static PyObject* wsql_result_free(wsql_result *self)
 {
     TRACE2("%p: %p", self, self->result);
     CHECK_RESULT(self, NULL);
 
-    if (!self->result) {
-        PyErr_SetString(_mysql_programming_error, "already destroyed.");
+    if (!self->result)
+    {
+        PyErr_SetString(wsql_programming_error, "the result has been destroyed already.");
         return NULL;
     }
 
@@ -238,24 +253,20 @@ _mysql_result_object_free(
     Py_RETURN_NONE;
 }
 
-static PyObject *
-_mysql_result_object__iter__(
-    _mysql_result_object *self,
-    PyObject *unused)
+static PyObject* wsql_result__iter__(wsql_result *self, PyObject *unused)
 {
     CHECK_RESULT(self, NULL);
     Py_INCREF(self);
     return (PyObject *)self;
 }
 
-static PyObject *
-_mysql_result_object_next(
-    _mysql_result_object *self)
+static PyObject* wsql_result_next(wsql_result *self)
 {
     PyObject *row;
     CHECK_RESULT(self, NULL);
-    row = _mysql_result_object_fetch_row(self);
-    if (row == Py_None) {
+    row = wsql_result_fetch_row(self);
+    if (row == Py_None)
+    {
         Py_DECREF(row);
         PyErr_SetString(PyExc_StopIteration, "");
         return NULL;
@@ -263,27 +274,21 @@ _mysql_result_object_next(
     return row;
 }
 
-static char _mysql_result_object_num_rows__doc__[] =
-"the number of rows in the result set. Note that if\n"
+static const char wsql_result_num_rows__doc__[] =
+"The number of rows in the result set. Note that if\n"
 "use=1, this will not return a valid value until the entire result\n"
 "set has been read.\n";
 
-static PyObject *
-_mysql_result_object_num_rows(
-    _mysql_result_object *self,
-    void* closure)
+static PyObject* wsql_result_get_num_rows(wsql_result *self, void* closure)
 {
     CHECK_RESULT(self, NULL);
     return PyLong_FromUnsignedLongLong(mysql_num_rows(self->result));
 }
 
-
-static char _mysql_result_object_data_seek__doc__[] =
+static const char wsql_result_data_seek__doc__[] =
 "data_seek(n) -- seek to row n of result set";
-static PyObject *
-_mysql_result_object_data_seek(
-     _mysql_result_object *self,
-     PyObject *args)
+
+static PyObject* wsql_result_data_seek(wsql_result *self, PyObject *args)
 {
     unsigned int row;
     if (!PyArg_ParseTuple(args, "i:data_seek", &row))
@@ -294,16 +299,13 @@ _mysql_result_object_data_seek(
     Py_RETURN_NONE;
 }
 
-static char _mysql_result_object_row_seek__doc__[] =
+static const char wsql_result_row_seek__doc__[] =
 "row_seek(n) -- seek by offset n rows of result set";
 
-static PyObject *
-_mysql_result_object_row_seek(
-     _mysql_result_object *self,
-     PyObject *args,
-     PyObject *kwargs)
+static PyObject* wsql_result_row_seek(wsql_result *self, PyObject *args, PyObject *kwargs)
 {
     static char *kwlist[] = {"origin", NULL};
+
     int origin=SEEK_CUR;
     Py_ssize_t offset;
 
@@ -312,8 +314,9 @@ _mysql_result_object_row_seek(
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "n|i:", kwlist, &offset, &origin))
 
     CHECK_RESULT(self, NULL);
-    if (self->use) {
-        PyErr_SetString(_mysql_programming_error, "cannot be used with connection.get_result(use=True)");
+    if (self->use)
+    {
+        PyErr_SetString(wsql_programming_error, "cannot be used with connection.get_result(use=True)");
         return NULL;
     }
 
@@ -328,7 +331,7 @@ _mysql_result_object_row_seek(
         r = self->result->data->data + (size_t)offset;
         break;
     default:
-        PyErr_SetString(_mysql_programming_error, "unsupported origin");
+        PyErr_SetString(wsql_programming_error, "unsupported origin");
         return NULL;
     };
 
@@ -336,18 +339,17 @@ _mysql_result_object_row_seek(
     Py_RETURN_NONE;
 }
 
-static char _mysql_result_object_row_tell__doc__[] =
+static const char wsql_result_row_tell__doc__[] =
 "row_tell() -- return the current row number of the result set.";
 
-static PyObject *
-_mysql_result_object_row_tell(
-    _mysql_result_object *self)
+static PyObject* wsql_result_row_tell(wsql_result *self)
 {
     MYSQL_ROW_OFFSET r;
 
     CHECK_RESULT(self, NULL);
-    if (self->use) {
-        PyErr_SetString(_mysql_programming_error, "cannot be used with connection.use_result()");
+    if (self->use)
+    {
+        PyErr_SetString(wsql_programming_error, "cannot be used with connection.use_result()");
         return NULL;
     }
     r = mysql_row_tell(self->result);
@@ -357,16 +359,14 @@ _mysql_result_object_row_tell(
 
 #ifdef HAVE_ASYNCIO
 
-static char _mysql_result_object_fetch_row_async__doc__[] =
+static const char wsql_result_fetch_row_async__doc__[] =
   "Fetch a row from the current query set in a non-blocking manner.\n"
   "Returns a tuple of (status, row).  Keep calling this function to\n"
   "retrieve all rows; when row is None, If status is NET_ASYNC_NOT_READY,\n"
   "the descriptor should be waited on for more rows.  Otherwise, status\n"
   "is NET_ASYNC_COMPLETE, and the query is complete.\n";
 
-static PyObject *
-_mysql_result_object_fetch_row_async(
-    _mysql_result_object *self)
+static PyObject* wsql_result_fetch_row_async(wsql_result *self)
 {
     PyObject *row = NULL, *result = NULL;
     MYSQL_ROW mysql_row;
@@ -376,38 +376,38 @@ _mysql_result_object_fetch_row_async(
 
     status = mysql_fetch_row_nonblocking(self->result, &mysql_row);
 
-    if (status == NET_ASYNC_NOT_READY) {
+    if (status == NET_ASYNC_NOT_READY)
+    {
         row = Py_None;
         Py_INCREF(row);
     }
-    else {
-        row = _mysql_convert_row(self, mysql_row);
+    else
+    {
+        row = wsql_result_convert_row(self, mysql_row);
     }
 
-    if (!(result = PyTuple_New(2)))
-        goto on_error;
-
-    PyTuple_SET_ITEM(result, 0, PyLong_FromLong((long)status));
-    PyTuple_SET_ITEM(result, 1, row);
-    return result;
+    if (row)
+    {
+        result = Py_BuildValue("(iO)", status, row);
+        Py_DECREF(row);
+        return result;
+    }
 
   on_error:
     Py_XDECREF(row);
     return NULL;
 }
 
-static char _mysql_result_object_free_async__doc__[] =
+static const char wsql_result_free_async__doc__[] =
 "free internal structures, should be called after all results are fetched(async version).";
 
-static PyObject *
-_mysql_result_object_free_async(
-    _mysql_result_object *self)
+static PyObject* wsql_result_free_async(wsql_result *self)
 {
     net_async_status status;
     CHECK_RESULT(self, NULL);
 
     if (!self->result) {
-        PyErr_SetString(_mysql_programming_error, "already destroyed.");
+        PyErr_SetString(wsql_programming_error, "The result has been destroyed already.");
         return NULL;
     }
 
@@ -420,169 +420,165 @@ _mysql_result_object_free_async(
 
 #endif //HAVE_ASYNCIO
 
-static void
-_mysql_result_object_dealloc(
-    _mysql_result_object *self)
+static void wsql_result_dealloc(wsql_result *self)
 {
     TRACE1("%p", self);
-    _mysql_result_object_clear(self);
+    wsql_result_clear(self);
     Py_FREE(self);
 }
 
-static PyObject *
-_mysql_result_object_repr(
-    _mysql_result_object *self)
+static PyObject* wsql_result_repr(wsql_result *self)
 {
     char buf[300];
-    sprintf(buf, "<_mysql.Result object at %p>", self);
+    sprintf(buf, "<" STRINGIFY(MODULE_NAME) ".Result object at %p>", self);
     return PyString_FromString(buf);
 }
 
-static PyMethodDef _mysql_result_object_methods[] = {
+static PyMethodDef wsql_result_methods[] = {
     {
         "data_seek",
-        (PyCFunction)_mysql_result_object_data_seek,
+        (PyCFunction)wsql_result_data_seek,
         METH_VARARGS,
-        _mysql_result_object_data_seek__doc__
+        wsql_result_data_seek__doc__
     },
     {
         "row_seek",
-        (PyCFunction)_mysql_result_object_row_seek,
+        (PyCFunction)wsql_result_row_seek,
         METH_VARARGS | METH_KEYWORDS,
-        _mysql_result_object_row_seek__doc__
+        wsql_result_row_seek__doc__
     },
     {
         "row_tell",
-        (PyCFunction)_mysql_result_object_row_tell,
+        (PyCFunction)wsql_result_row_tell,
         METH_NOARGS,
-        _mysql_result_object_row_tell__doc__
+        wsql_result_row_tell__doc__
     },
     {
         "fetch_row",
-        (PyCFunction)_mysql_result_object_fetch_row,
+        (PyCFunction)wsql_result_fetch_row,
         METH_NOARGS,
-        _mysql_result_object_fetch_row__doc__
+        wsql_result_fetch_row__doc__
     },
     {
         "free",
-        (PyCFunction)_mysql_result_object_free,
+        (PyCFunction)wsql_result_free,
         METH_NOARGS,
-        _mysql_result_object_free__doc__
+        wsql_result_free__doc__
     },
 
 #ifdef HAVE_ASYNCIO
     {
         "fetch_row_async",
-        (PyCFunction)_mysql_result_object_fetch_row_async,
+        (PyCFunction)wsql_result_fetch_row_async,
         METH_NOARGS,
-        _mysql_result_object_fetch_row_async__doc__
+        wsql_result_fetch_row_async__doc__
     },
     {
         "free_async",
-        (PyCFunction)_mysql_result_object_free_async,
+        (PyCFunction)wsql_result_free_async,
         METH_NOARGS,
-        _mysql_result_object_free_async__doc__
+        wsql_result_free_async__doc__
     },
 #endif
     {NULL,              NULL} /* sentinel */
 };
 
-static struct PyMemberDef _mysql_result_object_members[] = {
+static struct PyMemberDef wsql_result_members[] = {
     {
         "connection",
         T_OBJECT,
-        offsetof(_mysql_result_object, connection),
+        offsetof(wsql_result, connection),
         READONLY,
         "Connection associated with result"
     },
     {
         "fields",
         T_OBJECT,
-        offsetof(_mysql_result_object, fields),
+        offsetof(wsql_result, fields),
         READONLY,
         "Field metadata for result set"
     },
     {
         "num_fields",
         T_LONG,
-        offsetof(_mysql_result_object, num_fields),
+        offsetof(wsql_result, num_fields),
         READONLY,
         "The number of fields (column) in the result."
     },
     {
         "use",
         T_INT,
-        offsetof(_mysql_result_object, use),
+        offsetof(wsql_result, use),
         READONLY,
         "True if mysql_use_result() was used; False if mysql_store_result() was used"
     },
     {
         "more_rows",
         T_INT,
-        offsetof(_mysql_result_object, more_rows),
+        offsetof(wsql_result, more_rows),
         READONLY,
         "True if there is more rows, otherwise False"
     },
     {NULL} /* Sentinel */
 };
 
-static struct PyGetSetDef _mysql_result_object_getset[]  = {
+static struct PyGetSetDef wsql_result_getset[]  = {
     {
         "num_rows",
-        (getter)_mysql_result_object_num_rows,
+        (getter)wsql_result_get_num_rows,
         NULL,
-        _mysql_result_object_num_rows__doc__,
+        wsql_result_num_rows__doc__,
         NULL
     },
     {
         "description",
-        (getter)_mysql_result_object_description,
+        (getter)wsql_result_get_description,
         NULL,
-        _mysql_result_object_description__doc__,
+        wsql_result_description__doc__,
         NULL
     },
     {NULL} /* Sentinel */
 };
 
 
-PyTypeObject _mysql_result_object_t = {
+PyTypeObject wsql_result_t = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    STRINGIFY(MODULE_NAME) ".Result",                                               /* tp_name */
-    sizeof(_mysql_result_object),                                   /* tp_basicsize */
-    0,                                                             /* tp_itemsize */
-    (destructor)_mysql_result_object_dealloc,                       /* tp_dealloc */
-    0,                                                             /* tp_print */
-    0,                                                             /* tp_getattr */
-    0,                                                             /* tp_setattr */
-    0,                                                             /* tp_reserved */
-    (reprfunc)_mysql_result_object_repr,                            /* tp_repr */
-    0,                                                             /* tp_as_number */
-    0,                                                             /* tp_as_sequence */
-    0,                                                             /* tp_as_mapping */
-    0,                                                             /* tp_hash  */
-    0,                                                             /* tp_call */
-    0,                                                             /* tp_str */
-    0,                                                             /* tp_getattro */
-    0,                                                             /* tp_setattro */
-    0,                                                             /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,                                            /* tp_flags */
-    _mysql_result_object__doc__,                                    /* tp_doc */
-    0,                                                             /* tp_traverse */
-    (inquiry)_mysql_result_object_clear,                            /* tp_clear */
-    0,                                                             /* tp_richcompare */
-    0,                                                             /* tp_weaklistoffset */
-    (getiterfunc) _mysql_result_object__iter__,                     /* tp_iter */
-    (iternextfunc) _mysql_result_object_next,                       /* tp_iternext */
-    _mysql_result_object_methods,                                   /* tp_methods */
-    _mysql_result_object_members,                                   /* tp_members */
-    _mysql_result_object_getset,                                    /* tp_getset */
-    0,                                                             /* tp_base */
-    0,                                                             /* tp_dict */
-    0,                                                             /* tp_descr_get */
-    0,                                                             /* tp_descr_set */
-    0,                                                             /* tp_dictoffset */
-    (initproc)_mysql_result_object__init__,                         /* tp_init */
-    PyType_GenericAlloc,                                           /* tp_alloc */
-    (newfunc)_PyObject_NewVar,                                     /* tp_new */
-    PyObject_Del
+    STRINGIFY(MODULE_NAME) ".Result",   /* tp_name */
+    sizeof(wsql_result),                /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)wsql_result_dealloc,    /* tp_dealloc */
+    0,                                  /* tp_print */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_reserved */
+    (reprfunc)wsql_result_repr,         /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    wsql_result__doc__,                 /* tp_doc */
+    0,                                  /* tp_traverse */
+    (inquiry)wsql_result_clear,         /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    (getiterfunc) wsql_result__iter__,  /* tp_iter */
+    (iternextfunc) wsql_result_next,    /* tp_iternext */
+    wsql_result_methods,                /* tp_methods */
+    wsql_result_members,                /* tp_members */
+    wsql_result_getset,                 /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    (initproc)wsql_result__init__,      /* tp_init */
+    PyType_GenericAlloc,                /* tp_alloc */
+    (newfunc)_PyObject_NewVar,          /* tp_new */
+    PyObject_Del                        /* tp_del */
 };

@@ -1,16 +1,28 @@
 """
-WebSQL Connection Provider
---------------------------
+WSQL
+====
+An asynchronous DB API v2.0 compatible interface to MySQL
+---------------------------------------------------------
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-This module implements connections pools for WebSQL.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 import random
-import websql
+import wsql
 import sys
 
 from asyncio import coroutine
 from time import monotonic
-from websql.connections import UNSET
+from wsql.connections import UNSET
 
 
 __all__ = ["Upstream"]
@@ -181,8 +193,8 @@ class _AsyncUpstream(_UpstreamBase):
             info = self._servers[idx]
             if info.penalty < time_:
                 try:
-                    return Connection((yield from websql.connect(loop=self._loop, **info.kwargs)), info)
-                except websql.Error as e:
+                    return Connection((yield from wsql.connect(loop=self._loop, **info.kwargs)), info)
+                except wsql.Error as e:
                     self.invalidate(info, e)
 
         raise RuntimeError('There is no online servers.')
@@ -206,8 +218,8 @@ class _Upstream(_UpstreamBase):
             info = self._servers[idx]
             if info.penalty < time_:
                 try:
-                    return Connection(websql.connect(**info.kwargs), info)
-                except websql.Error as e:
+                    return Connection(wsql.connect(**info.kwargs), info)
+                except wsql.Error as e:
                     self.invalidate(info, e)
 
         raise RuntimeError('There is no online servers.')

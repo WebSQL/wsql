@@ -1,8 +1,20 @@
 """
-WebSQL Connection Cluster
--------------------------
+WSQL
+====
+An asynchronous DB API v2.0 compatible interface to MySQL
+---------------------------------------------------------
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-This module implements pool of connections and connection providers
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from .cluster import *
@@ -10,7 +22,7 @@ from .pool import *
 from .upstream import *
 from .functional import *
 
-from websql.connections import UNSET
+from wsql.connections import UNSET
 
 
 def connect(connection_args, loop=UNSET, logger=None, **kwargs):

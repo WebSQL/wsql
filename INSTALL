@@ -1,5 +1,5 @@
 ====================
-WebSQL Installation
+WSQL Installation
 ====================
 
 .. contents::
@@ -57,7 +57,7 @@ python3 setup.py build && python3 setup.py install
 
 Ubuntu
 ......
-export WEBSQL_EXTRA_LINKER_ARGS="-lrt" to add additional librt library, required by stdlib.
+export WSQL_EXTRA_LINKER_ARGS="-lrt" to add additional librt library, required by stdlib.
 
 
 :Revision: $Id$

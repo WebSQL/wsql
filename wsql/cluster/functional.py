@@ -1,12 +1,24 @@
 """
-WebSQL Scope Objects
---------------------
+WSQL
+====
+An asynchronous DB API v2.0 compatible interface to MySQL
+---------------------------------------------------------
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-This module implements scope objects for connections.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from asyncio import iscoroutine, iscoroutinefunction, coroutine
-import _websql
+import _wsql
 
 __all__ = ["transaction", "retryable"]
 
@@ -124,7 +136,7 @@ class AsyncRetryable:
         try:
             return (yield from self._connection.execute(query))
         except Exception as e:
-            if retry_number <= 0 or not _websql.exceptions.is_retryable(e):
+            if retry_number <= 0 or not _wsql.exceptions.is_retryable(e):
                 raise
         yield from self._sleep(self._delay, loop=self._loop)
         return (yield from self._execute(query, retry_number - 1))
@@ -147,7 +159,7 @@ class _Retryable:
         try:
             return self._connection.execute(query)
         except Exception as e:
-            if retry_number <= 0 or not _websql.exceptions.is_retryable(e):
+            if retry_number <= 0 or not _wsql.exceptions.is_retryable(e):
                 raise
 
         self._sleep(self._delay)

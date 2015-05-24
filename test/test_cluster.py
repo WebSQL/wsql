@@ -1,21 +1,37 @@
 """
-Tests Connection Pools
+WSQL
+====
+An asynchronous DB API v2.0 compatible interface to MySQL
+---------------------------------------------------------
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 __author__ = "@bg"
 
 try:
     from _case import DatabaseTestCase
-    from _websql_context import WebSQLSetup, WebSQLSetupAsync, WebSQLContextBase
+    import _wsql_context
 except ImportError:  # pragma: no cover
     from ._case import DatabaseTestCase
-    from ._websql_context import WebSQLSetup, WebSQLSetupAsync, WebSQLContextBase
+    from . import _wsql_context
 
 from unittest import TestCase
-from websql import exceptions
-from websql.cluster import ConnectionPool, Upstream, transaction, retryable, Cluster, connect
-from websql.cluster.upstream import ServerInfo, Connection
-from websql.cluster import _parser
+from wsql import exceptions
+from wsql.cluster import ConnectionPool, Upstream, transaction, retryable, Cluster, connect
+from wsql.cluster.upstream import ServerInfo, Connection
+from wsql.cluster import _parser
 
 
 class DummyLogger:
@@ -251,8 +267,8 @@ class TestCluster(DatabaseTestCase):
         self.assertEqual(6, len(connection._cluster[1]._connection._upstream))
         self.assertEqual(2, len(connection._cluster[0]._connection._upstream))
         # test real connect
-        connection_args = {"master": "%(host)s" % WebSQLSetup.connect_kwargs}
-        connection_args.update(WebSQLSetup.connect_kwargs)
+        connection_args = {"master": "%(host)s" % _wsql_context.Configuration.connect_kwargs}
+        connection_args.update(_wsql_context.Configuration.connect_kwargs)
         connection = connect(connection_args, loop=self._context.loop)
         connection.execute(self.wrap_query(lambda x: None))
 
@@ -260,7 +276,7 @@ class TestCluster(DatabaseTestCase):
 class TestClusterSync(TestCluster):
     @classmethod
     def get_context(cls):
-        return WebSQLContextBase(WebSQLSetup())
+        return _wsql_context.Context(_wsql_context.Configuration())
 
     def get_insert_query(self, table, error=None):
         def query(connection):
@@ -299,7 +315,7 @@ class TestClusterSync(TestCluster):
 class TestClusterAsync(TestCluster):
     @classmethod
     def get_context(cls):
-        return WebSQLContextBase(WebSQLSetupAsync())
+        return _wsql_context.Context(_wsql_context.ConfigurationAsync())
 
     def get_insert_query(self, table, error=None):
         @self._context.decorator

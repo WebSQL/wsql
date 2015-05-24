@@ -1,19 +1,33 @@
 """
-WebSQL type conversion module
-------------------------------
+WSQL
+====
+An asynchronous DB API v2.0 compatible interface to MySQL
+---------------------------------------------------------
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from collections import defaultdict
 from decimal import Decimal
 import datetime
 import struct
-import _websql
+import _wsql
 
 
-NULL = _websql.constants.NULL
+NULL = _wsql.constants.NULL
 
-_FLAG_BINARY = _websql.constants.FLAG_BINARY
-_FLAG_SET = _websql.constants.FLAG_SET
+_FLAG_BINARY = _wsql.constants.FLAG_BINARY
+_FLAG_SET = _wsql.constants.FLAG_SET
 
 
 def bool_to_sql(_, value):
@@ -164,31 +178,31 @@ simple_type_encoders = {
 # character sets, etc.). This should always be used as the last
 # resort.
 simple_field_decoders = {
-    _websql.constants.FIELD_TYPE_TINY_BLOB: bytes_or_None_if_NULL,
-    _websql.constants.FIELD_TYPE_MEDIUM_BLOB: bytes_or_None_if_NULL,
-    _websql.constants.FIELD_TYPE_LONG_BLOB: bytes_or_None_if_NULL,
+    _wsql.constants.FIELD_TYPE_TINY_BLOB: bytes_or_None_if_NULL,
+    _wsql.constants.FIELD_TYPE_MEDIUM_BLOB: bytes_or_None_if_NULL,
+    _wsql.constants.FIELD_TYPE_LONG_BLOB: bytes_or_None_if_NULL,
 
-    _websql.constants.FIELD_TYPE_TINY: int_or_None_if_NULL,
-    _websql.constants.FIELD_TYPE_SHORT: int_or_None_if_NULL,
-    _websql.constants.FIELD_TYPE_LONG: int_or_None_if_NULL,
-    _websql.constants.FIELD_TYPE_INT24: int_or_None_if_NULL,
-    _websql.constants.FIELD_TYPE_LONGLONG: int_or_None_if_NULL,
+    _wsql.constants.FIELD_TYPE_TINY: int_or_None_if_NULL,
+    _wsql.constants.FIELD_TYPE_SHORT: int_or_None_if_NULL,
+    _wsql.constants.FIELD_TYPE_LONG: int_or_None_if_NULL,
+    _wsql.constants.FIELD_TYPE_INT24: int_or_None_if_NULL,
+    _wsql.constants.FIELD_TYPE_LONGLONG: int_or_None_if_NULL,
 
-    _websql.constants.FIELD_TYPE_FLOAT: float_or_None_if_NULL,
-    _websql.constants.FIELD_TYPE_DOUBLE: float_or_None_if_NULL,
+    _wsql.constants.FIELD_TYPE_FLOAT: float_or_None_if_NULL,
+    _wsql.constants.FIELD_TYPE_DOUBLE: float_or_None_if_NULL,
 
-    _websql.constants.FIELD_TYPE_DECIMAL: decimal_or_None_if_NULL,
-    _websql.constants.FIELD_TYPE_NEWDECIMAL: decimal_or_None_if_NULL,
+    _wsql.constants.FIELD_TYPE_DECIMAL: decimal_or_None_if_NULL,
+    _wsql.constants.FIELD_TYPE_NEWDECIMAL: decimal_or_None_if_NULL,
 
-    _websql.constants.FIELD_TYPE_YEAR: int_or_None_if_NULL,
+    _wsql.constants.FIELD_TYPE_YEAR: int_or_None_if_NULL,
 
-    _websql.constants.FIELD_TYPE_TIMESTAMP: datetime_or_None_if_NULL,
-    _websql.constants.FIELD_TYPE_DATETIME: datetime_or_None_if_NULL,
-    _websql.constants.FIELD_TYPE_DATE: date_or_None_if_NULL,
-    _websql.constants.FIELD_TYPE_NEWDATE: date_or_None_if_NULL,
-    _websql.constants.FIELD_TYPE_TIME: timedelta_or_None_if_NULL,
+    _wsql.constants.FIELD_TYPE_TIMESTAMP: datetime_or_None_if_NULL,
+    _wsql.constants.FIELD_TYPE_DATETIME: datetime_or_None_if_NULL,
+    _wsql.constants.FIELD_TYPE_DATE: date_or_None_if_NULL,
+    _wsql.constants.FIELD_TYPE_NEWDATE: date_or_None_if_NULL,
+    _wsql.constants.FIELD_TYPE_TIME: timedelta_or_None_if_NULL,
 
-    _websql.constants.FIELD_TYPE_BIT: bit_or_None_if_NULL,
+    _wsql.constants.FIELD_TYPE_BIT: bit_or_None_if_NULL,
 }
 
 # Decoder protocol
@@ -231,11 +245,11 @@ def simple_encoder(_, value):
 
 
 character_types = {
-    _websql.constants.FIELD_TYPE_BLOB,
-    _websql.constants.FIELD_TYPE_STRING,
-    _websql.constants.FIELD_TYPE_VAR_STRING,
-    _websql.constants.FIELD_TYPE_VARCHAR,
-    _websql.constants.FIELD_TYPE_SET
+    _wsql.constants.FIELD_TYPE_BLOB,
+    _wsql.constants.FIELD_TYPE_STRING,
+    _wsql.constants.FIELD_TYPE_VAR_STRING,
+    _wsql.constants.FIELD_TYPE_VARCHAR,
+    _wsql.constants.FIELD_TYPE_SET
 }
 
 

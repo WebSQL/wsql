@@ -1,7 +1,7 @@
-websql
-======
+wsql
+====
 
 .. toctree::
    :maxdepth: 4
 
-   websql
+   wsql

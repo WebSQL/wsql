@@ -1,12 +1,21 @@
 """
-    Python DB API 2.0 driver compliance unit test suite.
-    This software is Public Domain and may be used without restrictions.
+WSQL
+====
+An asynchronous DB API v2.0 compatible interface to MySQL
+---------------------------------------------------------
 
-    Now we have booze and barflies entering the discussion, plus rumours of
-    DBAs on drugs... and I won't tell you what flashes through my mind each
-    time I read the subject line with 'Anal Compliance' in it.  All around
-    this is turning out to be a thoroughly unwholesome unit test."
-    -- Ian Bicking
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 __author__ = 'Stuart Bishop <zen@shangri-la.dropbear.id.au>'

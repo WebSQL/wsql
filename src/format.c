@@ -1,10 +1,29 @@
+/*
+WSQL
+====
+An asynchronous python interface to wsql
+---------------------------------------------------------
 
-#include "compat.h"
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#include "format.h"
 
 // added local support for formatting bytes
 // original pep  460
 
-struct _mysql_formatter_t {
+struct wsql_formatter_t {
     PyObject *args;
     Py_ssize_t args_len, args_pos;
 
@@ -16,14 +35,13 @@ struct _mysql_formatter_t {
     PyObject *output;
 };
 
-struct _mysql_format_arg_t {
+struct wsql_format_arg_t {
     char ch;
     int sign;
 };
 
 
-static int
-_mysql_format_resize_output(struct _mysql_formatter_t* ctx, Py_ssize_t size)
+static int wsql_format_resize_output(struct wsql_formatter_t* ctx, Py_ssize_t size)
 {
     if (_PyBytes_Resize(&(ctx->output), size) < 0) {
         return -1;
@@ -34,35 +52,37 @@ _mysql_format_resize_output(struct _mysql_formatter_t* ctx, Py_ssize_t size)
 }
 
 
-static int
-_mysql_format_write_char(struct _mysql_formatter_t* ctx, char c) {
-    if (ctx->out_pos == ctx->out_len && _mysql_format_resize_output(ctx, ctx->out_len << 1) < 0)
+static int wsql_format_write_char(struct wsql_formatter_t* ctx, char c) {
+    if (ctx->out_pos == ctx->out_len && wsql_format_resize_output(ctx, ctx->out_len << 1) < 0)
       return -1;
 
     ctx->out_data[ctx->out_pos++] = c;
     return 0;
 }
 
-static int
-_mysql_format_write_object(struct _mysql_formatter_t* ctx, PyObject* o) {
+static int wsql_format_write_object(struct wsql_formatter_t* ctx, PyObject* o) {
     PyObject* bytes = NULL;
     Py_ssize_t i;
 
-    if (PyLong_Check(o)) {
+    if (PyLong_Check(o))
+    {
         o = PyNumber_ToBase(o, 10);
         if (o == NULL)
             return -1;
         bytes = PyUnicode_AsASCIIString(o);
         Py_DECREF(o);
     }
-    else if (PyUnicode_Check(o)) {
+    else if (PyUnicode_Check(o))
+    {
         bytes = PyUnicode_AsASCIIString(o);
     }
-    else if (PyBytes_Check(o)) {
+    else if (PyBytes_Check(o))
+    {
         bytes = o;
         Py_INCREF(o);
     }
-    else {
+    else
+    {
         o = PyObject_Str(o);
         if (o == NULL)
             return -1;
@@ -75,7 +95,7 @@ _mysql_format_write_object(struct _mysql_formatter_t* ctx, PyObject* o) {
 
     Py_ssize_t len = PyBytes_GET_SIZE(bytes);
 
-    if (ctx->out_pos + len > ctx->out_len && _mysql_format_resize_output(ctx, (ctx->out_len + len) << 1) < 0)
+    if (ctx->out_pos + len > ctx->out_len && wsql_format_resize_output(ctx, (ctx->out_len + len) << 1) < 0)
       return -1;
 
     char* data = PyBytes_AS_STRING(bytes);
@@ -87,11 +107,12 @@ _mysql_format_write_object(struct _mysql_formatter_t* ctx, PyObject* o) {
     return 0;
 }
 
-static PyObject *
-_mysql_format_next_arg(struct _mysql_formatter_t *ctx) {
+static PyObject* wsql_format_next_arg(struct wsql_formatter_t *ctx)
+{
     Py_ssize_t args_pos = ctx->args_pos;
 
-    if (args_pos < ctx->args_len) {
+    if (args_pos < ctx->args_len)
+    {
         ++ctx->args_pos;
         return PyTuple_GetItem(ctx->args, args_pos);
     }
@@ -99,8 +120,8 @@ _mysql_format_next_arg(struct _mysql_formatter_t *ctx) {
     return NULL;
 }
 
-static int
-_mysql_format_float(PyObject *v, struct _mysql_format_arg_t *arg, PyObject **p_output) {
+static int wsql_format_float(PyObject *v, struct wsql_format_arg_t *arg, PyObject **p_output)
+{
     char *p;
     double x;
 
@@ -117,8 +138,7 @@ _mysql_format_float(PyObject *v, struct _mysql_format_arg_t *arg, PyObject **p_o
     return 0;
 }
 
-static PyObject*
-_mysql_format_long(PyObject *val, struct _mysql_format_arg_t *arg) {
+static PyObject* wsql_format_long(PyObject *val, struct wsql_format_arg_t *arg) {
     PyObject *result = NULL, *tmp = NULL;
     char *buf;
     Py_ssize_t i;
@@ -158,19 +178,23 @@ _mysql_format_long(PyObject *val, struct _mysql_format_arg_t *arg) {
     buf = PyBytes_AS_STRING(result);
     llen = PyBytes_GET_SIZE(result);
 
-    if (llen > INT_MAX) {
+    if (llen > INT_MAX)
+    {
         Py_DECREF(result);
         PyErr_SetString(PyExc_ValueError, "string too large in _PyBytes_FormatLong");
         return NULL;
     }
 
     /* Fix up case for hex conversions. */
-    if (type == 'X') {
+    if (type == 'X')
+    {
         /* Need to convert all lower case letters to upper case.
            and need to convert 0x to 0X (and -0x to -0X). */
-        for (i = 0; i < llen; i++)
+        for (i = 0; i < llen; ++i)
+        {
             if (buf[i] >= 'a' && buf[i] <= 'x')
                 buf[i] -= 'a'-'A';
+        }
     }
     return result;
 }
@@ -179,10 +203,8 @@ _mysql_format_long(PyObject *val, struct _mysql_format_arg_t *arg) {
  * Return 1 if the number has been formatted into the writer,
  *        0 if the number has been formatted into *p_output
  *       -1 and raise an exception on error */
-static int
-mysql_format_long_main(PyObject *v,
-                      struct _mysql_format_arg_t *arg,
-                      PyObject **p_output) {
+static int wsql_format_long_main(PyObject *v, struct wsql_format_arg_t *arg, PyObject **p_output)
+{
     PyObject *iobj, *res;
     char type = (char)arg->ch;
 
@@ -190,18 +212,23 @@ mysql_format_long_main(PyObject *v,
         goto on_error;
 
     /* make sure number is a type of integer for o, x, and X */
-    if (!PyLong_Check(v)) {
-        if (type == 'o' || type == 'x' || type == 'X') {
+    if (!PyLong_Check(v))
+    {
+        if (type == 'o' || type == 'x' || type == 'X')
+        {
             iobj = PyNumber_Index(v);
-            if (iobj == NULL) {
+            if (iobj == NULL)
+            {
                 if (PyErr_ExceptionMatches(PyExc_TypeError))
                     goto on_error;
                 return -1;
             }
         }
-        else {
+        else
+        {
             iobj = PyNumber_Long(v);
-            if (iobj == NULL ) {
+            if (iobj == NULL )
+            {
                 if (PyErr_ExceptionMatches(PyExc_TypeError))
                     goto on_error;
                 return -1;
@@ -209,12 +236,13 @@ mysql_format_long_main(PyObject *v,
         }
         assert(PyLong_Check(iobj));
     }
-    else {
+    else
+    {
         iobj = v;
         Py_INCREF(iobj);
     }
 
-    res = _mysql_format_long(iobj, arg);
+    res = wsql_format_long(iobj, arg);
     Py_DECREF(iobj);
     if (res == NULL)
         return -1;
@@ -249,25 +277,26 @@ on_error:
    - "e", "E", "f", "F", "g", "G": float
    - "c": int or str (1 character)
 */
-static int
-_mysql_format_arg_format(struct _mysql_formatter_t *ctx,
-                         struct _mysql_format_arg_t *arg) {
+static int wsql_format_arg_format(struct wsql_formatter_t *ctx, struct wsql_format_arg_t *arg)
+{
     PyObject *v, *p_str = NULL;
     int ret;
 
-    if (arg->ch == '%') {
-        if (_mysql_format_write_char(ctx, '%') < 0)
+    if (arg->ch == '%')
+    {
+        if (wsql_format_write_char(ctx, '%') < 0)
             return -1;
         return 1;
     }
 
-    v = _mysql_format_next_arg(ctx);
+    v = wsql_format_next_arg(ctx);
     if (v == NULL)
         return -1;
 
-    switch (arg->ch) {
+    switch (arg->ch)
+    {
     case 's':
-        if (_mysql_format_write_object(ctx, v) < 0)
+        if (wsql_format_write_object(ctx, v) < 0)
             return -1;
         return 0;
 
@@ -277,7 +306,7 @@ _mysql_format_arg_format(struct _mysql_formatter_t *ctx,
     case 'o':
     case 'x':
     case 'X':
-        if (mysql_format_long_main(v, arg, &p_str) < 0)
+        if (wsql_format_long_main(v, arg, &p_str) < 0)
             return -1;
         arg->sign = 1;
         break;
@@ -288,7 +317,7 @@ _mysql_format_arg_format(struct _mysql_formatter_t *ctx,
     case 'F':
     case 'g':
     case 'G':
-       if (_mysql_format_float(v, arg, &p_str) < 0)
+       if (wsql_format_float(v, arg, &p_str) < 0)
                 return -1;
         break;
 
@@ -304,47 +333,48 @@ _mysql_format_arg_format(struct _mysql_formatter_t *ctx,
     if (p_str == NULL)
         return -1;
 
-    ret = _mysql_format_write_object(ctx, p_str);
+    ret = wsql_format_write_object(ctx, p_str);
     Py_DECREF(p_str);
     return ret;
 }
 
 /* Helper of PyUnicode_Format(): format one arg.
    Return 0 on success, raise an exception and return -1 on error. */
-static int
-_mysql_format_arg(struct _mysql_formatter_t *ctx) {
-    struct _mysql_format_arg_t arg;
+static int wsql_format_arg(struct wsql_formatter_t *ctx)
+{
+    struct wsql_format_arg_t arg;
 
     arg.ch = ctx->fmt_data[ctx->fmt_pos++];
     arg.sign = 0;
 
-    if (_mysql_format_arg_format(ctx, &arg) < 0)
+    if (wsql_format_arg_format(ctx, &arg) < 0)
         return -1;
 
     return 0;
 }
 
 
-char _mysql_format__doc__[] =
+char wsql_format__doc__[] =
 "format query, style like printf.\n" \
 "Non-standard.\n";
 
 
-PyObject *
-_mysql_format(PyObject *self, PyObject *args)
+PyObject* wsql_format(PyObject *self, PyObject *args)
 {
-    struct _mysql_formatter_t ctx;
+    struct wsql_formatter_t ctx;
     char c;
 
     if (!PyArg_ParseTuple(args, "OO:format", &ctx.fmt, &ctx.args))
         return NULL;
 
-    if (!PyBytes_Check(ctx.fmt)) {
+    if (!PyBytes_Check(ctx.fmt))
+    {
         PyErr_SetString(PyExc_TypeError, "format should be bytes");
         return NULL;
     }
 
-    if (!PyTuple_Check(ctx.args)) {
+    if (!PyTuple_Check(ctx.args))
+    {
         PyErr_SetString(PyExc_TypeError, "arguments should be tuple");
         return NULL;
     }
@@ -361,31 +391,37 @@ _mysql_format(PyObject *self, PyObject *args)
     ctx.out_data = PyBytes_AS_STRING(ctx.output);
     ctx.out_len = PyBytes_GET_SIZE(ctx.output);
 
-    while (ctx.fmt_pos < ctx.fmt_len) {
-        if (ctx.fmt_data[ctx.fmt_pos] != '%') {
-            while (ctx.fmt_pos < ctx.fmt_len) {
+    while (ctx.fmt_pos < ctx.fmt_len)
+    {
+        if (ctx.fmt_data[ctx.fmt_pos] != '%')
+        {
+            while (ctx.fmt_pos < ctx.fmt_len)
+            {
                 c = ctx.fmt_data[ctx.fmt_pos];
                 if (c == '%')
                     break;
 
-                _mysql_format_write_char(&ctx, c);
+                wsql_format_write_char(&ctx, c);
                 ++ctx.fmt_pos;
             }
         }
-        else {
+        else
+        {
 
             ++ctx.fmt_pos;
-            if (_mysql_format_arg(&ctx) == -1)
+            if (wsql_format_arg(&ctx) == -1)
                 goto on_error;
         }
     }
 
-    if (ctx.args_pos < ctx.args_len) {
+    if (ctx.args_pos < ctx.args_len)
+    {
         PyErr_SetString(PyExc_TypeError, "not all arguments converted during string formatting");
         goto on_error;
     }
 
-    if (ctx.out_pos != ctx.out_len && _PyBytes_Resize(&(ctx.output), ctx.out_pos) < 0) {
+    if (ctx.out_pos != ctx.out_len && _PyBytes_Resize(&(ctx.output), ctx.out_pos) < 0)
+    {
        goto on_error;
     }
 

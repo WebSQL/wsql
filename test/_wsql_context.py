@@ -20,28 +20,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 __author__ = "@bg"
 
-from websql.cursors import INSERT_VALUES
-from websql.connections import UNSET
 from os import getenv
-import _websql
 import asyncio
 import warnings
-import websql
+import wsql
+import wsql.exceptions
+import wsql.connections
+import wsql.cursors
+import _wsql
 
 warnings.filterwarnings('error')
 
 
-class WebSQLSetupBase:
+class ConfigurationBase:
 
-    module = websql
-    INSERT_VALUES = INSERT_VALUES
-    errors = _websql.exceptions
-    constants = _websql.constants
+    module = wsql
+    INSERT_VALUES = wsql.cursors.INSERT_VALUES
+    errors = wsql.exceptions
+    constants = _wsql.constants
 
-    connect_kwargs = {"host": getenv('WEBSQL_TEST_HOST', '127.0.0.1'),
-                      "database": getenv('WEBSQL_TEST_DATABASE', 'test'),
-                      "user": getenv('WEBSQL_TEST_USER', 'root'),
-                      "password": getenv('WEBSQL_TEST_PASSWORD', ''),
+    connect_kwargs = {"host": getenv('WSQL_TEST_HOST', '127.0.0.1'),
+                      "database": getenv('WSQL_TEST_DATABASE', 'test'),
+                      "user": getenv('WSQL_TEST_USER', 'root'),
+                      "password": getenv('WSQL_TEST_PASSWORD', ''),
                       "charset": "utf8",
                       "sql_mode": "ANSI,STRICT_TRANS_TABLES,TRADITIONAL"}
 
@@ -51,8 +52,8 @@ class WebSQLSetupBase:
     leak_test = False
 
 
-class WebSQLSetup(WebSQLSetupBase):
-    loop = UNSET
+class Configuration(ConfigurationBase):
+    loop = wsql.connections.UNSET
 
     @staticmethod
     def decorator(func):
@@ -67,7 +68,7 @@ class WebSQLSetup(WebSQLSetupBase):
         """
         :return: new connection to database
         """
-        return websql.connect(**self.connect_kwargs)
+        return self.module.connect(**self.connect_kwargs)
 
     @staticmethod
     def wait(ref):
@@ -104,7 +105,7 @@ class WebSQLSetup(WebSQLSetupBase):
         pass
 
 
-class WebSQLSetupAsync(WebSQLSetupBase):
+class ConfigurationAsync(ConfigurationBase):
 
     class WrapObject:
         def __init__(self, obj, context):
@@ -153,7 +154,7 @@ class WebSQLSetupAsync(WebSQLSetupBase):
         """
         :return: Future for connection
         """
-        return websql.connect(loop=self.loop, **self.connect_kwargs)
+        return self.module.connect(loop=self.loop, **self.connect_kwargs)
 
     def wait(self, obj):
         """
@@ -182,7 +183,7 @@ class WebSQLSetupAsync(WebSQLSetupBase):
         return self.wait(func(*args, **kwargs))
 
 
-class WebSQLContextBase:
+class Context:
     def __init__(self, setup):
         self._setup = setup
         self._connection = setup.wait(setup.connect())
@@ -237,13 +238,3 @@ class WebSQLContextBase:
         :return: the value of reference
         """
         return self._setup.wait(ref)
-
-
-class WebSQLContext(WebSQLContextBase):
-    def __init__(self):
-        super().__init__(WebSQLSetup())
-
-
-class WebSQLAsyncContext(WebSQLContextBase):
-    def __init__(self):
-        super().__init__(WebSQLSetupAsync())

@@ -1,38 +1,56 @@
-#include "mysqlmod.h"
+/*
+WSQL
+====
+An asynchronous python interface to MySQL
+---------------------------------------------------------
 
-const char _mysql_constants__doc__[] =
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#include "module.h"
+
+const char wsql_constants__doc__[] =
 "Various constants used by the MySQL client/server protocol.\n";
 
 #ifdef PY3K
-PyModuleDef _mysql_constants_module =
+PyModuleDef wsql_constants_module =
 {
     PyModuleDef_HEAD_INIT,
     STRINGIFY(MODULE_NAME) ".constants", /* name of module */
-    _mysql_constants__doc__,             /* module documentation, may be NULL */
+    wsql_constants__doc__,               /* module documentation, may be NULL */
     -1,                                  /* size of per-interpreter state of the module,
                                             or -1 if the module keeps state in global variables. */
     NULL, NULL, NULL, NULL, NULL
 };
 #endif  // PY3K
 
-extern int _mysql_constants_add_err(PyObject* module);
+extern int wsql_constants_add_errors(PyObject* module);
 
-
-int _mysql_constants_add(
-    PyObject* module)
+int wsql_constants_init(PyObject* module)
 {
     PyObject *constants = NULL;
 #ifdef PY3K
-    constants = PyModule_Create(&_mysql_constants_module);
+    constants = PyModule_Create(&wsql_constants_module);
 #else
-    constants = Py_InitModule3(STRINGIFY(MODULE_NAME) ".constants", NULL, _mysql_constants__doc__);
+    constants = Py_InitModule3(STRINGIFY(MODULE_NAME) ".constants", NULL, wsql_constants__doc__);
 #endif
-    if (!constants)
-        return -1;
+
+    if (!constants) return -1;
 
     if (PyModule_AddStringConstant(constants, "NULL", "NULL") < 0) goto error;
 
-    if (_mysql_constants_add_err(constants) < 0) goto error;
+    if (wsql_constants_add_errors(constants) < 0) goto error;
 
 #ifdef HAVE_ASYNCIO
     if (PyModule_AddIntConstant(constants, "NET_ASYNC_COMPLETE", NET_ASYNC_COMPLETE) < 0) goto error;

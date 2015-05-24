@@ -1,11 +1,23 @@
 """
-WebSQL Exceptions
---------------------
+WSQL
+====
+An asynchronous DB API v2.0 compatible interface to MySQL
+---------------------------------------------------------
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-This module describes all websql exceptions
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import _websql
+import _wsql
 
 
 __all__ = ["Warning", "Error", "InterfaceError", "DatabaseError", "DataError", "OperationalError",
@@ -13,17 +25,17 @@ __all__ = ["Warning", "Error", "InterfaceError", "DatabaseError", "DataError", "
            "UserError", "handle_error"]
 
 
-Warning = _websql.exceptions.Warning
-Error = _websql.exceptions.Error
-InterfaceError = _websql.exceptions.InterfaceError
-DatabaseError = _websql.exceptions.DatabaseError
-DataError = _websql.exceptions.DataError
-OperationalError = _websql.exceptions.OperationalError
-IntegrityError = _websql.exceptions.IntegrityError
-InternalError = _websql.exceptions.InternalError
-ProgrammingError = _websql.exceptions.ProgrammingError
-NotSupportedError = _websql.exceptions.NotSupportedError
-StandardError = _websql.exceptions.StandardError
+Warning = _wsql.exceptions.Warning
+Error = _wsql.exceptions.Error
+InterfaceError = _wsql.exceptions.InterfaceError
+DatabaseError = _wsql.exceptions.DatabaseError
+DataError = _wsql.exceptions.DataError
+OperationalError = _wsql.exceptions.OperationalError
+IntegrityError = _wsql.exceptions.IntegrityError
+InternalError = _wsql.exceptions.InternalError
+ProgrammingError = _wsql.exceptions.ProgrammingError
+NotSupportedError = _wsql.exceptions.NotSupportedError
+StandardError = _wsql.exceptions.StandardError
 
 
 class UserError(ProgrammingError):

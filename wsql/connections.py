@@ -1,17 +1,27 @@
 """
-WebSQL Connections
-------------------
+WSQL
+====
+An asynchronous DB API v2.0 compatible interface to MySQL
+---------------------------------------------------------
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-This module implements connections for WebSQL.
-You should not try to
-create Connection directly; use connect method instead.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 __author = "@bg"
 
 from .converters import default_decoders, default_encoders, default_row_formatter
 from .import exceptions
-import _websql
+import _wsql
 import asyncio
 import weakref
 
@@ -75,7 +85,7 @@ def connect(*args, loop=UNSET, **kwargs):
     :param defer_warnings: if True, the warnings will be ignored
     :type defer_warnings: bool
     :param use_result: store results on server or use buffered results
-    type   use_result: bool
+    :type   use_result: bool
     :return: new coroutine in nonblocking mode and connection otherwise
     """
 
@@ -136,21 +146,40 @@ class ConnectionBase(object):
         self.encoders = default_encoders if encoders is None else encoders
         self.decoders = default_decoders if decoders is None else decoders
         self.row_formatter = default_row_formatter if row_formatter is None else row_formatter
-        self.format = _websql.format
+        self.format = _wsql.format
         self.defer_warnings = defer_warnings
         self.use_result = use_result
 
         client_flag = client_flag or 0
-        client_version = tuple((int(n) for n in _websql.get_client_info().split('.')[:2]))
+        client_version = tuple((int(n) for n in _wsql.get_client_info().split('.')[:2]))
         if client_version >= (4, 1):
-            client_flag |= _websql.constants.CLIENT_MULTI_STATEMENTS
+            client_flag |= _wsql.constants.CLIENT_MULTI_STATEMENTS
         if client_version >= (5, 0):
-            client_flag |= _websql.constants.CLIENT_MULTI_RESULTS
+            client_flag |= _wsql.constants.CLIENT_MULTI_RESULTS
 
-        self._db = _websql.connect(*args, client_flag=client_flag, **kwargs)
+        self._db = _wsql.connect(*args, client_flag=client_flag, **kwargs)
         self.messages = []
         self._server_version = None
         weakref.finalize(self, lambda db: db.closed or db.close(), db=self._db)
+
+    def setup(self, charset, sql_mode):
+        """
+        :param charset:  If supplied, the connection character set will be changed
+                         to this character set (MySQL-4.1 and newer). This implies use_unicode=True.
+        :type charset: str
+        :param sql_mode: If supplied, the session SQL mode will be changed to this
+                         setting (MySQL-4.1 and newer). For more details and legal
+                         values, see the MySQL documentation.
+        :type sql_mode: str
+        :return: None
+        """
+        if charset:
+            self._db.charset = charset
+        if sql_mode:
+            self._db.set_sql_mode(sql_mode)
+
+        self._server_version = tuple(int(n) for n in self._db.server_info.split('.')[:2])
+        self._db.autocommit = False
 
     def __getattr__(self, item):
         """get attribute"""
@@ -182,13 +211,7 @@ class Connection(ConnectionBase):
         from .cursors import Cursor
         super().__init__(Cursor, *args, **kwargs)
 
-        if charset:
-            self._db.charset = charset
-        if sql_mode:
-            self._db.set_sql_mode(sql_mode)
-
-        self._db.autocommit = False
-        self._server_version = tuple(int(n) for n in self._db.server_info.split('.')[:2])
+        self.setup(charset, sql_mode)
 
     def __enter__(self):
         """context object method"""
@@ -245,11 +268,11 @@ class AsyncConnection(ConnectionBase):
     """The asynchronous connection implementation"""
 
     _Future = asyncio.Future
-    NET_ASYNC_WRITE = _websql.constants.NET_ASYNC_WRITE
-    NET_ASYNC_READ = _websql.constants.NET_ASYNC_READ
-    NET_ASYNC_CONNECT = _websql.constants.NET_ASYNC_CONNECT
-    NET_ASYNC_COMPLETE = _websql.constants.NET_ASYNC_COMPLETE
-    NET_ASYNC_NOT_READY = _websql.constants.NET_ASYNC_NOT_READY
+    NET_ASYNC_WRITE = _wsql.constants.NET_ASYNC_WRITE
+    NET_ASYNC_READ = _wsql.constants.NET_ASYNC_READ
+    NET_ASYNC_CONNECT = _wsql.constants.NET_ASYNC_CONNECT
+    NET_ASYNC_COMPLETE = _wsql.constants.NET_ASYNC_COMPLETE
+    NET_ASYNC_NOT_READY = _wsql.constants.NET_ASYNC_NOT_READY
 
     def __init__(self, *args, loop=None, **kwargs):
         """
@@ -261,24 +284,6 @@ class AsyncConnection(ConnectionBase):
         super().__init__(AsyncCursor, *args, nonblocking=True, **kwargs)
         self._loop = asyncio.get_event_loop() if loop is None else loop
         self._server_version = None
-
-    def setup(self, charset, sql_mode):
-        """
-        :param charset:  If supplied, the connection character set will be changed
-                         to this character set (MySQL-4.1 and newer). This implies use_unicode=True.
-        :type charset: str
-        :param sql_mode: If supplied, the session SQL mode will be changed to this
-                         setting (MySQL-4.1 and newer). For more details and legal
-                         values, see the MySQL documentation.
-        :type sql_mode: str
-        :return: None
-        """
-        self._server_version = tuple(int(n) for n in self._db.server_info.split('.')[:2])
-        if charset:
-            self._db.charset = charset
-        if sql_mode:
-            self._db.set_sql_mode(sql_mode)
-        self._db.autocommit = False
 
     def start(self):
         """

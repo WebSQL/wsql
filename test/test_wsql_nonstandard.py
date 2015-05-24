@@ -20,30 +20,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 try:
     from _case import DatabaseTestCase, TestCase
-    from _websql_context import WebSQLSetup, WebSQLSetupAsync, WebSQLContextBase
+    import _wsql_context
 except ImportError:  # pragma: no cover
     from ._case import DatabaseTestCase, TestCase
-    from ._wsql_context import WebSQLSetup, WebSQLSetupAsync, WebSQLContextBase
+    from . import _wsql_context
 
-from websql import converters
-import websql
-import _websql
+from wsql import converters
+import wsql
+import _wsql
 import warnings
 import types
 
 
 class TestDBAPISet(TestCase):
     def test_set_equality(self):
-        self.assertEqual(websql.STRING, websql.STRING)
+        self.assertEqual(wsql.STRING, wsql.STRING)
 
     def test_set_inequality(self):
-        self.assertNotEqual(websql.STRING, websql.NUMBER)
+        self.assertNotEqual(wsql.STRING, wsql.NUMBER)
 
     def test_set_equality_membership(self):
-        self.assertEqual(_websql.constants.FIELD_TYPE_VAR_STRING, websql.STRING)
+        self.assertEqual(_wsql.constants.FIELD_TYPE_VAR_STRING, wsql.STRING)
 
     def test_set_inequality_membership(self):
-        self.assertNotEqual(_websql.constants.FIELD_TYPE_DATE, websql.STRING)
+        self.assertNotEqual(_wsql.constants.FIELD_TYPE_DATE, wsql.STRING)
 
 
 class TestConverters(TestCase):
@@ -76,8 +76,14 @@ class TestConverters(TestCase):
 
     def test_get_codec(self):
         """test get_codec method"""
-        self.assertRaisesRegex(WebSQLSetup.errors.NotSupportedError, "could not encode as SQL", converters.get_codec, WebSQLSetup.errors, None, ())
-        self.assertRaisesRegex(WebSQLSetup.errors.NotSupportedError, "could not encode as SQL", converters.get_codec, WebSQLSetup.errors, None, (lambda x, y: None,))
+        self.assertRaisesRegex(_wsql_context.Configuration.errors.NotSupportedError,
+                               "could not encode as SQL",
+                               converters.get_codec, _wsql_context.Configuration.errors,
+                               None, ())
+        self.assertRaisesRegex(_wsql_context.Configuration.errors.NotSupportedError,
+                               "could not encode as SQL",
+                               converters.get_codec, _wsql_context.Configuration.errors,
+                               None, (lambda x, y: None,))
         self.assertEqual("a", converters.get_codec(None, None, (lambda x, y: "a",)))
 
 
@@ -86,20 +92,20 @@ class TestCoreModule(TestCase):
 
     def test_NULL(self):
         """Should have a NULL constant."""
-        self.assertEqual(_websql.constants.NULL, 'NULL')
+        self.assertEqual(_wsql.constants.NULL, 'NULL')
 
     def test_version(self):
         """Version information sanity."""
-        self.assertIsInstance(_websql.__version__, str)
+        self.assertIsInstance(_wsql.__version__, str)
 
-        self.assertIsInstance(_websql.version_info, tuple)
-        self.assertEqual(5, len(_websql.version_info))
+        self.assertIsInstance(_wsql.version_info, tuple)
+        self.assertEqual(5, len(_wsql.version_info))
 
     def test_client_info(self):
-        self.assertIsInstance(_websql.get_client_info(), str)
+        self.assertIsInstance(_wsql.get_client_info(), str)
 
     def test_thread_safe(self):
-        self.assertIsInstance(_websql.thread_safe(), int)
+        self.assertIsInstance(_wsql.thread_safe(), int)
 
 
 class CoreAPI(DatabaseTestCase):
@@ -132,13 +138,13 @@ class CoreAPI(DatabaseTestCase):
 class TestCoreApi(CoreAPI):
     @classmethod
     def get_context(cls):
-        return WebSQLContextBase(WebSQLSetup())
+        return _wsql_context.Context(_wsql_context.Configuration())
 
 
 class TestCoreAsyncApi(CoreAPI):
     @classmethod
     def get_context(cls):
-        return WebSQLContextBase(WebSQLSetupAsync())
+        return _wsql_context.Context(_wsql_context.ConfigurationAsync())
 
 del CoreAPI
 
@@ -184,7 +190,7 @@ class TestCursorBase(DatabaseTestCase):
 class TestCursor(TestCursorBase):
     @classmethod
     def get_context(cls):
-        return WebSQLContextBase(WebSQLSetup())
+        return _wsql_context.Context(_wsql_context.Configuration())
 
     def test_context_manager(self):
         # in case if cursor will not closed warning will be raised
@@ -195,6 +201,6 @@ class TestCursor(TestCursorBase):
 class TestCursorAsync(TestCursorBase):
     @classmethod
     def get_context(cls):
-        return WebSQLContextBase(WebSQLSetupAsync())
+        return _wsql_context.Context(_wsql_context.ConfigurationAsync())
 
 del TestCursorBase

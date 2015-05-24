@@ -1,15 +1,25 @@
 """
-WebSQL Cursors
---------------
+WSQL
+====
+An asynchronous DB API v2.0 compatible interface to MySQL
+---------------------------------------------------------
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-This module implements the Cursor classes. You should not try to
-create Cursors directly; use connection.cursor() instead.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from .converters import get_codec
 from warnings import warn
-import _websql
+import _wsql
 import asyncio
 import re
 import weakref
@@ -28,9 +38,9 @@ class CursorBase:
     _use_result = False
     _defer_warnings = False
 
-    ProgrammingError = _websql.exceptions.ProgrammingError
-    StandardError = _websql.exceptions.StandardError
-    NotSupportedError = _websql.exceptions.NotSupportedError
+    ProgrammingError = _wsql.exceptions.ProgrammingError
+    StandardError = _wsql.exceptions.StandardError
+    NotSupportedError = _wsql.exceptions.NotSupportedError
 
     def __init__(self, connection, encoders, decoders, row_formatter):
         """
@@ -393,7 +403,7 @@ class Cursor(CursorBase):
 class AsyncCursor(CursorBase):
     """Asynchronous cursor implementation"""
 
-    NET_ASYNC_COMPLETE = _websql.constants.NET_ASYNC_COMPLETE
+    NET_ASYNC_COMPLETE = _wsql.constants.NET_ASYNC_COMPLETE
     _use_result = True
 
     class _NullResult:
