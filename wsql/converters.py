@@ -327,6 +327,19 @@ def tuple_row_decoder(decoders, names, row):
     return tuple(iter_row_decoder(decoders, names, row))
 
 
+class _ObjectDict(defaultdict):
+    """Makes a dictionary behave like an object, with attribute-style access.
+    """
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError(name)
+
+    def __setattr__(self, name, value):
+        self[name] = value
+
+
 def dict_row_decoder(decoders, names, row):
     """
     decode row as dict
@@ -340,9 +353,9 @@ def dict_row_decoder(decoders, names, row):
         return None
 
     def recursive_factory():
-        return defaultdict(recursive_factory)
+        return _ObjectDict(recursive_factory)
 
-    result = defaultdict(recursive_factory)
+    result = recursive_factory()
 
     for name, value in zip(names, iter_row_decoder(decoders, names, row)):
         *patch, name = name.split('.')
@@ -353,4 +366,5 @@ def dict_row_decoder(decoders, names, row):
     return result
 
 
+object_row_decoder = dict_row_decoder
 default_row_formatter = tuple_row_decoder

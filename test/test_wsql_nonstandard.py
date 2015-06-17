@@ -74,6 +74,17 @@ class TestConverters(TestCase):
         result = converters.dict_row_decoder(decoders, names, rows)
         self.assertEqual({"a": 0, "b": {"c": 1}, "d": {"e": {"f": {"g": 2}}}, "i": {"k": {"l": {"m": {"n": 3}}}}}, result)
 
+    def test_object_row_decoder(self):
+        """test format row as object"""
+        rows = list(range(4))
+
+        names = ("a", "b.c")
+        decoders = (lambda x: x for _ in range(len(rows)))
+        self.assertIsNone(converters.object_row_decoder(decoders, None, None))
+        result = converters.object_row_decoder(decoders, names, rows)
+        self.assertEqual(0, result.a)
+        self.assertEqual(1, result.b.c)
+
     def test_get_codec(self):
         """test get_codec method"""
         self.assertRaisesRegex(_wsql_context.Configuration.errors.NotSupportedError,
