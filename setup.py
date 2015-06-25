@@ -204,7 +204,7 @@ module1 = Extension('_' + __name__,
 
 
 def readme():
-    with open('README') as r:
+    with open('README.rst') as r:
         return r.read()
 
 
