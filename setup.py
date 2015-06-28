@@ -230,7 +230,7 @@ setup(
     long_description=readme(),
     keywords=["mysql", "asyncio", "asyncsql"],
     classifiers=[
-        "Development Status :: 4 - Beta",
+        "Development Status :: 5 - Production/Stable",
         "Environment :: Other Environment",
         "License :: OSI Approved :: GNU General Public License (GPL)",
         "Operating System :: MacOS :: MacOS X",
