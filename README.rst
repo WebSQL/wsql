@@ -30,6 +30,16 @@ The design goals are:
 
 MySQL-5.5 and newer and Python-3.4 and newer are currently supported.
 
+
+Setup dependencies
+==================
+- cmake version 2.8.11 or higher
+- openssl-devel version 1.0 or higher
+- python3-devel
+- zlib-devel
+- gcc
+
+
 WSQL is `Free Software`_.
 
 `Documentation`_.

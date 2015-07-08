@@ -271,12 +271,12 @@ PYENTRY_FUNC_NAME(void)
 
     /* Module constants */
     if (PyModule_AddObject(module, "version_info",
-                           PyRun_String(STRINGIFY(version_info),
+                           PyRun_String(STRINGIFY(MODULE_VERSION_INFO),
                                         Py_eval_input,
                                         PyModule_GetDict(module),
                                         PyModule_GetDict(module))) < 0) goto on_error;
 
-    if (PyModule_AddStringConstant(module, "__version__", STRINGIFY(__version__)) < 0) goto on_error;
+    if (PyModule_AddStringConstant(module, "__version__", STRINGIFY(MODULE_VERSION)) < 0) goto on_error;
 
     if (wsql_exceptions_init(module) < 0) goto on_error;
     if (wsql_constants_init(module) < 0) goto on_error;

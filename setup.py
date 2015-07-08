@@ -182,9 +182,7 @@ class BuildExt(build_ext):
                 self.libraries.append(basename[start:end])
 
 __name__ = "wsql"
-__version__ = "1.2.2"
-
-extra_link_args = ["-lstdc++"]
+__version__ = "1.2.5"
 
 module1 = Extension('_' + __name__,
                     sources=["./src/connections.c",
@@ -194,17 +192,18 @@ module1 = Extension('_' + __name__,
                              "./src/format.c",
                              "./src/module.c",
                              "./src/results.c"],
-                    extra_compile_args=["-Os", "-g", "-fno-strict-aliasing", "-std=c99"],
+                    extra_compile_args=["-Os", "-g", "-std=c99", "-fno-strict-aliasing",
+                                        "-Wno-error=declaration-after-statement"],
                     extra_link_args=["-lstdc++"],
                     define_macros=[
                         ("MODULE_NAME", '_' + __name__),
-                        ("version_info", "(%d, %d, %d, 'beta', 0)" % tuple(map(int, __version__.split('.')))),
-                        ("__version__", __version__),
+                        ("MODULE_VERSION_INFO", "(%d, %d, %d, 'beta', 0)" % tuple(map(int, __version__.split('.')))),
+                        ("MODULE_VERSION", __version__),
                     ])
 
 
 def readme():
-    with open('README.rst') as r:
+    with open('README') as r:
         return r.read()
 
 
