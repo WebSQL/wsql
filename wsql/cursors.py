@@ -645,4 +645,3 @@ class AsyncCursor(CursorBase):
         Not supported yet
         """
         raise self.NotSupportedError
-

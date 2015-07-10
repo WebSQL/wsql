@@ -32,52 +32,51 @@ Timestamp = datetime
 
 def date_from_ticks(ticks):
     """
-        Convert UNIX ticks into a date instance.
-        >>> date_from_ticks(1172466380)
-        datetime.date(2007, 2, 26)
-        >>> date_from_ticks(0)
-        datetime.date(1970, 1, 1)
-        >>> date_from_ticks(2 ** 31 - 1)
-        datetime.date(2038, 1, 19)
+    Convert UNIX ticks into a date instance.
+    >>> date_from_ticks(1172466380)
+    datetime.date(2007, 2, 26)
+    >>> date_from_ticks(0)
+    datetime.date(1970, 1, 1)
+    >>> date_from_ticks(2 ** 31 - 1)
+    datetime.date(2038, 1, 19)
 
-        This is a standard DB-API constructor.
+    This is a standard DB-API constructor.
     """
     return date(*localtime(ticks)[:3])
+
 
 DateFromTicks = date_from_ticks
 
 
 def time_from_ticks(ticks):
     """
-        Convert UNIX ticks into a time instance.
-    
-        >>> time_from_ticks(1172466380)
-        datetime.time(8, 6, 20)
-        >>> time_from_ticks(0)
-        datetime.time(3, 0)
-        >>> time_from_ticks(2 ** 31 - 1)
-        datetime.time(6, 14, 7)
-    
-        This is a standard DB-API constructor.
+    Convert UNIX ticks into a time instance.
+
+    >>> time_from_ticks(1172466380)
+    datetime.time(8, 6, 20)
+    >>> time_from_ticks(0)
+    datetime.time(3, 0)
+    >>> time_from_ticks(2 ** 31 - 1)
+    datetime.time(6, 14, 7)
     """
     return time(*localtime(ticks)[3:6])
+
 
 TimeFromTicks = time_from_ticks
 
 
 def timestamp_from_ticks(ticks):
     """
-        Convert UNIX ticks into a datetime instance.
-    
-        >>> timestamp_from_ticks(1172466380)
-        datetime.datetime(2007, 2, 26, 8, 6, 20)
-        >>> timestamp_from_ticks(0)
-        datetime.datetime(1970, 1, 1, 3, 0)
-        >>> timestamp_from_ticks(2 ** 31 - 1)
-        datetime.datetime(2038, 1, 19, 6, 14, 7)
-    
-        This is a standard DB-API constructor.
+    Convert UNIX ticks into a datetime instance.
+
+    >>> timestamp_from_ticks(1172466380)
+    datetime.datetime(2007, 2, 26, 8, 6, 20)
+    >>> timestamp_from_ticks(0)
+    datetime.datetime(1970, 1, 1, 3, 0)
+    >>> timestamp_from_ticks(2 ** 31 - 1)
+    datetime.datetime(2038, 1, 19, 6, 14, 7)
     """
     return datetime(*localtime(ticks)[:6])
+
 
 TimestampFromTicks = timestamp_from_ticks
