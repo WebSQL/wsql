@@ -185,7 +185,7 @@ __name__ = "wsql"
 __version__ = "1.2.5"
 
 module1 = Extension('_' + __name__,
-                    sources=["./src/connections.c",
+                    sources=["./src/connection.c",
                              "./src/constants.c",
                              "./src/exceptions.c",
                              "./src/fields.c",
