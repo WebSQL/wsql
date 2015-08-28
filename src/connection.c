@@ -113,45 +113,48 @@ int wsql_connection__init__(wsql_connection *self, PyObject *args, PyObject *kwa
     Py_BEGIN_ALLOW_THREADS ;
     conn = mysql_init(&(self->connection));
 
-    if (compress != -1)
+    if (conn != NULL)
     {
-        mysql_options(&(self->connection), MYSQL_OPT_COMPRESS, 0);
-        client_flag |= CLIENT_COMPRESS;
-    }
-    if (connect_timeout)
-        mysql_options(&(self->connection), MYSQL_OPT_CONNECT_TIMEOUT, (char *)&connect_timeout);
-    if (init_command != NULL)
-        mysql_options(&(self->connection), MYSQL_INIT_COMMAND, init_command);
-    if (read_default_file != NULL)
-        mysql_options(&(self->connection), MYSQL_READ_DEFAULT_FILE, read_default_file);
-    if (read_default_group != NULL)
-        mysql_options(&(self->connection), MYSQL_READ_DEFAULT_GROUP, read_default_group);
-    if (local_infile != -1)
-        mysql_options(&(self->connection), MYSQL_OPT_LOCAL_INFILE, (char *) &local_infile);
-
-#ifdef _WIN32
-    if (socket_name != NULL)
-        mysql_options(&(self->connection), MYSQL_OPT_NAMED_PIPE, 0);
-#endif
-
-#if HAVE_OPENSSL
-    if (ssl)
-        mysql_ssl_set(&(self->connection), key, cert, ca, capath, cipher);
-#endif
-
-    if (nonblocking)
-    {
-#ifdef HAVE_ASYNCIO
-        if (!mysql_real_connect_nonblocking_init(&(self->connection),
-                host, user, password, database, port, socket_name, client_flag))
+        if (compress != -1)
         {
-            conn = NULL;
+            mysql_options(conn, MYSQL_OPT_COMPRESS, 0);
+            client_flag |= CLIENT_COMPRESS;
         }
-#endif
-    }
-    else
-    {
-        conn = mysql_real_connect(&(self->connection), host, user, password, database, port, socket_name, client_flag);
+        if (connect_timeout)
+            mysql_options(conn, MYSQL_OPT_CONNECT_TIMEOUT, (char *)&connect_timeout);
+        if (init_command != NULL)
+            mysql_options(conn, MYSQL_INIT_COMMAND, init_command);
+        if (read_default_file != NULL)
+            mysql_options(conn, MYSQL_READ_DEFAULT_FILE, read_default_file);
+        if (read_default_group != NULL)
+            mysql_options(conn, MYSQL_READ_DEFAULT_GROUP, read_default_group);
+        if (local_infile != -1)
+            mysql_options(conn, MYSQL_OPT_LOCAL_INFILE, (char *) &local_infile);
+
+    #ifdef _WIN32
+        if (socket_name != NULL)
+            mysql_options(conn, MYSQL_OPT_NAMED_PIPE, 0);
+    #endif
+
+    #if HAVE_OPENSSL
+        if (ssl)
+            mysql_ssl_set(conn, key, cert, ca, capath, cipher);
+    #endif
+
+        if (nonblocking)
+        {
+    #ifdef HAVE_ASYNCIO
+            if (!mysql_real_connect_nonblocking_init(
+                conn, host, user, password, database, port, socket_name, client_flag))
+            {
+                conn = NULL;
+            }
+    #endif
+        }
+        else
+        {
+            conn = mysql_real_connect(conn, host, user, password, database, port, socket_name, client_flag);
+        }
     }
 
     self->autocommit = self->connection.server_capabilities & CLIENT_TRANSACTIONS ? 1 : 0;
