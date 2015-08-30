@@ -167,7 +167,10 @@ int wsql_connection__init__(wsql_connection *self, PyObject *args, PyObject *kwa
     }
 
     self->open = 1;
-    self->connected = 1;
+    if (!nonblocking)
+    {
+        self->connected = 1;
+    }
     return 0;
 }
 
@@ -915,10 +918,14 @@ static PyObject* wsql_connection_run_async(wsql_connection *self)
     CHECK_CONNECTION(self, NULL);
     status = mysql_real_connect_nonblocking_run(&(self->connection), &error);
 
-    if (status == NET_ASYNC_COMPLETE && error)
+    if (status == NET_ASYNC_COMPLETE)
     {
-        TRACE2("%p, %d", self, error);
-        return wsql_raise_error(self);
+        if (error)
+        {
+            TRACE2("%p, %d", self, error);
+            return wsql_raise_error(self);
+        }
+        self->connected = 1;
     }
 
     return Py_BuildValue("(iO)", (int)status, Py_None);
