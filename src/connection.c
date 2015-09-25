@@ -1188,7 +1188,6 @@ static PyMethodDef wsql_connection_methods[] = {
         "query_async",
         (PyCFunction)wsql_connection_query_async,
         METH_VARARGS,
-        METH_VARARGS,
         wsql_connection_query_async__doc__
     },
     {
@@ -1253,21 +1252,21 @@ static PyGetSetDef wsql_connection_getset[]  = {
         "autocommit",
         (getter)wsql_connection_get_autocommit,
         (setter)wsql_connection_set_autocommit,
-        wsql_connection_autocommit__doc__,
+        (char*)wsql_connection_autocommit__doc__,
         NULL,
     },
     {
         "closed",
         (getter)wsql_connection_get_closed,
         NULL,
-        wsql_connection_closed__doc__,
+        (char*)wsql_connection_closed__doc__,
         NULL
     },
     {
         "affected_rows",
         (getter)wsql_connection_get_affected_rows,
         NULL,
-        wsql_connection_affected_rows__doc__,
+        (char*)wsql_connection_affected_rows__doc__,
         NULL
     },
 #if MYSQL_VERSION_ID >= 40100
@@ -1275,14 +1274,14 @@ static PyGetSetDef wsql_connection_getset[]  = {
         "sqlstate",
         (getter)wsql_connection_get_sqlstate,
         NULL,
-        wsql_connection_sqlstate__doc__,
+        (char*)wsql_connection_sqlstate__doc__,
         NULL
     },
     {
         "warning_count",
         (getter)wsql_connection_get_warning_count,
         NULL,
-        wsql_connection_warning_count__doc__,
+        (char*)wsql_connection_warning_count__doc__,
         NULL
     },
 #endif
@@ -1290,7 +1289,7 @@ static PyGetSetDef wsql_connection_getset[]  = {
         "charset",
         (getter)wsql_connection_get_charset,
         (setter)wsql_connection_set_charset,
-        wsql_connection_charset__doc__,
+        (char*)wsql_connection_charset__doc__,
         NULL
     },
 #if MYSQL_VERSION_ID >= 50010
@@ -1298,7 +1297,7 @@ static PyGetSetDef wsql_connection_getset[]  = {
         "charset_info",
         (getter)wsql_connection_get_charset_info,
         NULL,
-        wsql_connection_charset_info__doc__,
+        (char*)wsql_connection_charset_info__doc__,
         NULL
     },
 #endif
@@ -1306,70 +1305,70 @@ static PyGetSetDef wsql_connection_getset[]  = {
         "error",
         (getter)wsql_connection_get_error,
         NULL,
-        wsql_connection_error__doc__,
+        (char*)wsql_connection_error__doc__,
         NULL
     },
     {
         "errno",
         (getter)wsql_connection_get_errno,
         NULL,
-        wsql_connection_errno__doc__,
+        (char*)wsql_connection_errno__doc__,
         NULL
     },
     {
         "field_count",
         (getter)wsql_connection_get_field_count,
         NULL,
-        wsql_connection_field_count__doc__,
+        (char*)wsql_connection_field_count__doc__,
         NULL
     },
     {
         "host_info",
         (getter)wsql_connection_get_host_info,
         NULL,
-        wsql_connection_host_info__doc__,
+        (char*)wsql_connection_host_info__doc__,
         NULL
     },
     {
         "proto_info",
         (getter)wsql_connection_get_proto_info,
         NULL,
-        wsql_connection_proto_info__doc__,
+        (char*)wsql_connection_proto_info__doc__,
         NULL
     },
         {
         "server_info",
         (getter)wsql_connection_get_server_info,
         NULL,
-        wsql_connection_server_info__doc__,
+        (char*)wsql_connection_server_info__doc__,
         NULL
     },
     {
         "info",
         (getter)wsql_connection_get_info,
         NULL,
-        wsql_connection_info__doc__,
+        (char*)wsql_connection_info__doc__,
         NULL
     },
     {
         "last_insert_id",
         (getter)wsql_connection_get_insert_id,
         NULL,
-        wsql_connection_insert_id__doc__,
+        (char*)wsql_connection_insert_id__doc__,
         NULL
     },
     {
         "stat",
         (getter)wsql_connection_get_stat,
         NULL,
-        wsql_connection_stat__doc__,
+        (char*)wsql_connection_stat__doc__,
         NULL
     },
     {
         "thread_id",
         (getter)wsql_connection_get_thread_id,
         NULL,
-        wsql_connection_thread_id__doc__,
+        (char*)wsql_connection_thread_id__doc__,
         NULL
     },
 #ifdef HAVE_ASYNCIO
@@ -1377,14 +1376,14 @@ static PyGetSetDef wsql_connection_getset[]  = {
         "fd",
         (getter)wsql_connection_get_file_descriptor,
         NULL,
-        wsql_connection_file_descriptor__doc__,
+        (char*)wsql_connection_file_descriptor__doc__,
         NULL
     },
     {
         "async_operation",
         (getter)wsql_connection_get_async_operation,
         NULL,
-        wsql_connection_async_operation__doc__,
+        (char*)wsql_connection_async_operation__doc__,
         NULL
     },
 
