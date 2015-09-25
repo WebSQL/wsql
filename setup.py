@@ -54,7 +54,6 @@ class CmakeRun(Command):
             self.mkpath(self.build_dir)
         self.build_dir = os.path.abspath(self.build_dir)
         if self.define:
-            print(self.define)
             self.define = ['-D{0}'.format(v) for v in self.define.split(',') if v]
 
     def command(self, cmd):
