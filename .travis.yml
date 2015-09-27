@@ -1,6 +1,8 @@
 language: python
+
 python:
   - "3.4"
+  - "3.5"
 
 env:
  - WSQL_TEST_DATABASE=wsql_test WSQL_TEST_USER=root CI_BUILD=1
