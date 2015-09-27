@@ -8,6 +8,7 @@ env:
  - WSQL_TEST_DATABASE=wsql_test WSQL_TEST_USER=root CI_BUILD=1
 
 before_install:
+  - pip install -U pip setuptools
   - pip install -r requirements.dev.txt
 
 install:
