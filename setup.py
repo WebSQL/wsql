@@ -3,6 +3,8 @@
 from setuptools import setup
 from setuptools.command.build_ext import build_ext
 from setuptools import Extension, Command
+from distutils import sysconfig
+
 import os
 
 try:
@@ -61,6 +63,11 @@ class CmakeRun(Command):
         self.announce(cmd)
         self.spawn(cmd)
 
+    @staticmethod
+    def set_env():
+        for k in ("CFLAGS", "LDFLAGS", "CXXFLAGS"):
+            os.environ[k] = sysconfig.get_config_var(k) or ""
+
     def run(self):
         """build target by cmake"""
         pwd = os.getcwd()
@@ -72,7 +79,9 @@ class CmakeRun(Command):
             make_cmd.append('-d')
         if self.trace:
             cmake_cmd.append('--trace')
+
         try:
+            self.set_env()
             self.command(cmake_cmd)
             self.command(make_cmd)
         finally:
@@ -141,8 +150,8 @@ class BuildExt(build_ext):
         self.include_dirs.extend(os.path.join(x, 'include') for x in (cmake.build_dir, cmake.source_dir))
         self.libraries.append(cmake.libname)
 
-        self.add_library_dirs((os.path.join(os.path.join(cmake.build_dir, x) for x in ('libmysql', 'zlib'))))
-        self.add_library_dirs((os.path.join(cmake.build_dir, 'extra', 'yassl', x) for x in ('', 'taocrypt')))
+        self.add_library_dirs(os.path.join(cmake.build_dir, x) for x in ('libmysql', 'zlib'))
+        self.add_library_dirs(os.path.join(cmake.build_dir, 'extra', 'yassl', x) for x in ('', 'taocrypt'))
         self.parse_libraries(os.path.join(cmake.build_dir, 'libmysql', 'libraries.txt'))
 
         gen_errors = self.get_finalized_command('gen_errors')

@@ -1,22 +1,24 @@
 language: python
+
 python:
   - "3.4"
+  - "3.5"
 
 env:
  - WSQL_TEST_DATABASE=wsql_test WSQL_TEST_USER=root CI_BUILD=1
 
 before_install:
-  - pip install coveralls coverage
+  - pip install -U pip setuptools
+  - pip install -r requirements.dev.txt
 
 install:
-  - python setup.py install
+  - pip install .
 
 before_script:
   - mysql -e 'create database wsql_test CHARACTER SET UTF8 COLLATE utf8_unicode_ci';
 
 script:
- - coverage run -m unittest discover --start-directory test
- - coverage report -m
+ - ./run-tests
 
 after_success:
  - coveralls
