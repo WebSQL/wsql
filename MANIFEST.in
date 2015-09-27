@@ -4,5 +4,7 @@ include MANIFEST
 include HISTORY
 inlcude README
 inlcude README.rst
+include requirements.dev.txt
+include run-tests
 recursive-include extra *
 recursive-include src *.h *.c
