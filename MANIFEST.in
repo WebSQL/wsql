@@ -5,4 +5,4 @@ include HISTORY
 inlcude README
 inlcude README.rst
 recursive-include extra *
-recursive-include src *.h
+recursive-include src *.h *.c

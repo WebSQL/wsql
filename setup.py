@@ -3,6 +3,8 @@
 from setuptools import setup
 from setuptools.command.build_ext import build_ext
 from setuptools import Extension, Command
+from distutils import sysconfig
+
 import os
 
 try:
@@ -54,13 +56,17 @@ class CmakeRun(Command):
             self.mkpath(self.build_dir)
         self.build_dir = os.path.abspath(self.build_dir)
         if self.define:
-            print(self.define)
             self.define = ['-D{0}'.format(v) for v in self.define.split(',') if v]
 
     def command(self, cmd):
         """announce command and spawn"""
         self.announce(cmd)
         self.spawn(cmd)
+
+    @staticmethod
+    def set_env():
+        for k in ("CFLAGS", "LDFLAGS", "CXXFLAGS"):
+            os.environ[k] = sysconfig.get_config_var(k) or ""
 
     def run(self):
         """build target by cmake"""
@@ -73,7 +79,9 @@ class CmakeRun(Command):
             make_cmd.append('-d')
         if self.trace:
             cmake_cmd.append('--trace')
+
         try:
+            self.set_env()
             self.command(cmake_cmd)
             self.command(make_cmd)
         finally:

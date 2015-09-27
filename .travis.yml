@@ -9,7 +9,7 @@ before_install:
   - pip install coveralls coverage
 
 install:
-  - python setup.py install
+  - pip install .
 
 before_script:
   - mysql -e 'create database wsql_test CHARACTER SET UTF8 COLLATE utf8_unicode_ci';
