@@ -393,8 +393,6 @@ static PyObject* wsql_result_fetch_row_async(wsql_result *self)
         return result;
     }
 
-  on_error:
-    Py_XDECREF(row);
     return NULL;
 }
 
@@ -527,14 +525,14 @@ static struct PyGetSetDef wsql_result_getset[]  = {
         "num_rows",
         (getter)wsql_result_get_num_rows,
         NULL,
-        wsql_result_num_rows__doc__,
+        (char*)wsql_result_num_rows__doc__,
         NULL
     },
     {
         "description",
         (getter)wsql_result_get_description,
         NULL,
-        wsql_result_description__doc__,
+        (char*)wsql_result_description__doc__,
         NULL
     },
     {NULL} /* Sentinel */
