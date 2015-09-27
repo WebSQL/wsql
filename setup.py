@@ -150,8 +150,8 @@ class BuildExt(build_ext):
         self.include_dirs.extend(os.path.join(x, 'include') for x in (cmake.build_dir, cmake.source_dir))
         self.libraries.append(cmake.libname)
 
-        self.add_library_dirs((os.path.join(os.path.join(cmake.build_dir, x) for x in ('libmysql', 'zlib'))))
-        self.add_library_dirs((os.path.join(cmake.build_dir, 'extra', 'yassl', x) for x in ('', 'taocrypt')))
+        self.add_library_dirs(os.path.join(cmake.build_dir, x) for x in ('libmysql', 'zlib'))
+        self.add_library_dirs(os.path.join(cmake.build_dir, 'extra', 'yassl', x) for x in ('', 'taocrypt'))
         self.parse_libraries(os.path.join(cmake.build_dir, 'libmysql', 'libraries.txt'))
 
         gen_errors = self.get_finalized_command('gen_errors')
