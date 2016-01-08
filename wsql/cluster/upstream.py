@@ -16,9 +16,11 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 import random
-import wsql
+import logging
 import sys
+import wsql
 
 from asyncio import coroutine
 from time import monotonic
@@ -133,7 +135,7 @@ class _UpstreamBase:
         else:
             self._servers.append(ServerInfo(**kwargs))
 
-        self._logger = logger
+        self._logger = logger or logging.getLogger(__package__)
         self.current = 0
         self.count = len(self._servers)
         self.penalty = 60  # 1 min
@@ -189,15 +191,26 @@ class _AsyncUpstream(_UpstreamBase):
         """
         current = self.current
         time_ = monotonic()
+        blacklist = []
         for idx in ((i + current) % self.count for i in range(self.count)):
             info = self._servers[idx]
-            if info.penalty < time_:
+            if info.penalty <= time_:
                 try:
                     return Connection((yield from wsql.connect(loop=self._loop, **info.kwargs)), info)
                 except wsql.Error as e:
                     self.invalidate(info, e)
 
-        raise RuntimeError('There is no online servers.')
+            if info.penalty > time_:
+                blacklist.append(info)
+
+        blacklist.sort(key=lambda x: x.penalty)
+        for info in blacklist:
+            try:
+                return Connection((yield from wsql.connect(loop=self._loop, **info.kwargs)), info)
+            except wsql.Error as e:
+                self.invalidate(info, e)
+
+        raise RuntimeError('There is no servers to connect.')
 
 
 class _Upstream(_UpstreamBase):

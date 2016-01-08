@@ -102,7 +102,8 @@ class TestCluster(DatabaseTestCase):
         kwargs2 = self._context.connect_kwargs.copy()
         kwargs2['port'] = 1
         upstream = self.make_upstream([kwargs2])
-        self.assertRaises(RuntimeError, lambda: self._context.wait(next(upstream)))
+        with self.assertRaises(RuntimeError):
+            self._context.wait(next(upstream))
 
     def test_invalidate(self):
         """test invalidate method of Upstream"""
