@@ -23,6 +23,7 @@ from .upstream import *
 from .functional import *
 
 from wsql.connections import UNSET
+from wsql.converters import object_row_decoder
 
 
 def connect(connection_args, loop=UNSET, logger=None, **kwargs):
@@ -39,6 +40,8 @@ def connect(connection_args, loop=UNSET, logger=None, **kwargs):
     from ._parser import parse_connection_string, uri_parser
 
     connection_args = parse_connection_string(connection_args, kwargs)
+    connection_args.setdefault('row_formatter', object_row_decoder)
+
     retries = int(connection_args.pop('retries', 5))
     delay = float(connection_args.pop('delay', 0.2))
     timeout = int(connection_args.pop('timeout', 1))
