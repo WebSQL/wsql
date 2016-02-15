@@ -198,6 +198,10 @@ class _AsyncUpstream(_UpstreamBase):
                 try:
                     return Connection((yield from wsql.connect(loop=self._loop, **info.kwargs)), info)
                 except wsql.Error as e:
+                    # 1040 -- to many connections
+                    # TODO need to properly handle this case
+                    if e.code == 1040:
+                        raise
                     self.invalidate(info, e)
 
             if info.penalty > time_:
