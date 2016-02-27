@@ -392,4 +392,15 @@ class TestParsers(TestCase):
     def test_uri_parser(self):
         """test parse uri"""
         result = _parser.uri_parser(lambda x: list(x))("mysql://localhost:3306#2,127.0.0.1#4")
-        self.assertEqual([{"scheme": "mysql", "host": "localhost", "port": '3306', "count": '2'}, {"scheme": None, "port": None, "host": "127.0.0.1", "count": '4'}], result)
+        self.assertEqual(
+            [
+                {"scheme": "mysql", "host": "localhost", "port": "3306", "count": "2"},
+                {"scheme": None, "port": None, "host": "127.0.0.1", "count": "4"}
+            ],
+            result
+        )
+        result = _parser.uri_parser(lambda x: list(x))("a-b_c123.13.domen.com:3306#1")
+        self.assertEqual(
+            [{"scheme": None, "host": "a-b_c123.13.domen.com", "port": "3306", "count": "1"}],
+            result
+        )

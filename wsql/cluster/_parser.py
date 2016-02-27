@@ -42,7 +42,7 @@ def uri_parser(callback):
     :return: connection args
     """
     import re
-    uri_scheme = re.compile(r"(?:(?:(?:(?:(?P<scheme>mysql?)://)?(?P<host>[\w\d\.]+)(?::(?P<port>\d+))?(?:#(?P<count>\d+))?),?)+?)")
+    uri_scheme = re.compile(r"(?:(?:(?:(?:(?P<scheme>mysql?)://)?(?P<host>[\w\d\.\-_~]+)(?::(?P<port>\d+))?(?:#(?P<count>\d+))?),?)+?)")
 
     def parser(uri):
         if uri:
