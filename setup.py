@@ -190,7 +190,7 @@ class BuildExt(build_ext):
                 self.libraries.append(basename[start:end])
 
 __name__ = "wsql"
-__version__ = "1.2.12"
+__version__ = "1.2.13"
 
 module1 = Extension('_' + __name__,
                     sources=["./src/connection.c",

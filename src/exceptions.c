@@ -117,13 +117,11 @@ PyObject* wsql_check_error_code(PyObject* args, bool (*checker)(int))
     if (!PyArg_ParseTuple(args, "O", &exception))
         return NULL;
 
-    if (PyObject_IsInstance(exception, wsql_error))
+    if (PyObject_IsInstance(exception, wsql_error) && PyObject_HasAttrString(exception, "code"))
     {
         PyObject* code = PyObject_GetAttrString(exception, "code");
-        if (code && checker(PyLong_AsLong(code)))
-            result = 1;
-
-        Py_XDECREF(code);
+        result = PyLong_Check(code) && checker(PyLong_AsLong(code));
+        Py_DECREF(code);
     }
     return PyBool_FromLong(result);
 }
