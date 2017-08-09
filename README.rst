@@ -44,6 +44,8 @@ WSQL is `Free Software`_.
 
 `Documentation`_.
 
+Developed by using `CLion`_.
+
 .. _`MySQL`: http://www.mysql.com/
 .. _`Free Software`: http://www.gnu.org/
 .. _`WebScaleSQL`: http://webscalesql.org/
@@ -51,3 +53,4 @@ WSQL is `Free Software`_.
 .. _`Percona-XtraDB-Cluster`: http://www.percona.com/software/percona-xtradb-cluster
 .. _`GaleraCluster`: http://galeracluster.com/products/
 .. _`Documentation`: http://websql-websql.rhcloud.com/
+.. _`CLion`:  https://www.jetbrains.com/clion/
